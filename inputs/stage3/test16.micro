@@ -1,0 +1,12 @@
+PROGRAM test
+BEGIN
+	FUNCTION INT main()
+	BEGIN
+
+	c:=a+b;
+	b:=g*j+i*o+p*l+(a)+h*j+k;
+	c:=(a*b+i)+p*p+h+j+k+i+y*u/r;
+	RETURN a+b;
+	END
+END
+

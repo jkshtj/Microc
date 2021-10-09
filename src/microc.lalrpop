@@ -1,0 +1,344 @@
+use crate::symbol_table::SymbolTable;
+use crate::ast::NumType;
+use crate::ast::token::{Token as MicrocToken, TokenType};
+use crate::ast::decl::{StringDecl, IntDecl, FloatDecl};
+use lalrpop_util::ParseError;
+
+grammar;
+
+//////////////////////////
+///////// Tokens /////////
+//////////////////////////
+match {
+    // Keywords
+    "PROGRAM" => PROGRAM,
+    "BEGIN" => BEGIN,
+    "END" => END,
+    "FUNCTION" => FUNCTION,
+    "READ" => READ,
+    "WRITE" => WRITE,
+    "IF" => IF,
+    "ELSE" => ELSE,
+    "FI" => FI,
+    "FOR" => FOR,
+    "ROF" => ROF,
+    "RETURN" => RETURN,
+    "INT" => INT,
+    "VOID" => VOID,
+    "STRING" => STRING,
+    "FLOAT" => FLOAT,
+
+    // Operators
+    ":=",
+    "+",
+    "-",
+    "*",
+    "/",
+    "=",
+    "!=",
+    "<",
+    ">",
+    "(",
+    ")",
+    ";",
+    ",",
+    "<=",
+    ">=",
+
+    // Identifiers
+    r"[a-zA-Z][a-zA-Z0-9]*" => IDENTIFIER,
+
+    // Literals
+    r"[0-9]+" => INTLITERAL,
+    r"[0-9]+\.[0-9]+|\.[0-9]+" => FLOATLITERAL,
+    r#""[^"]*""# => STRINGLITERAL,
+
+    // Discard comments
+    r"\s*" => { },
+    r"--[^\n\r]*" => { },
+}
+
+//////////////////////////
+///////// Grammar ////////
+//////////////////////////
+pub Program: () = {
+    PROGRAM IDENTIFIER BEGIN pgm_body end_program,
+};
+
+end_program: () = {
+    END => {
+        SymbolTable::end_curr_scope();
+    },
+};
+
+empty: () = ();
+
+pgm_body: () = {
+    decl func_declarations,
+};
+
+decl: () = {
+    string_decl decl,
+    var_decl decl,
+    empty,
+};
+
+string_decl: () = {
+    STRING <id:IDENTIFIER> ":=" <val:STRINGLITERAL> ";" =>? {
+        SymbolTable::add_symbol(StringDecl::new(
+            MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()),
+            MicrocToken::STRINGLITERAL(TokenType::LITERAL, val.to_owned())
+        )).or_else(|decl_err| {
+            SymbolTable::set_decl_error(decl_err);
+            Err(ParseError::User {
+                error: "Encountered declaration error!",
+            })
+        })
+    },
+};
+
+var_decl: () = {
+    <ty:var_type> <ids:id_list> ";" =>? {
+        ids.iter().try_for_each(|&id| {
+            match ty {
+                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+                NumType::Int => SymbolTable::add_symbol(IntDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+            }.or_else(|decl_err| {
+                SymbolTable::set_decl_error(decl_err);
+                Err(ParseError::User {
+                    error: "Encountered declaration error!",
+                })
+            })
+        })
+    },
+};
+
+var_type: NumType = {
+    FLOAT => NumType::Float,
+    INT => NumType::Int,
+};
+
+any_type: () = {
+    var_type,
+    VOID,
+};
+
+id_list: Vec<&'input str> = {
+    <mut ids: (<IDENTIFIER> ",")*> <id: IDENTIFIER?> => match id {
+        Some(id) => {
+            ids.push(id);
+            ids
+        },
+        None => ids,
+    },
+};
+
+param_decl_list: () = {
+    param_decl param_decl_tail,
+    empty,
+};
+
+param_decl: () = {
+    <ty:var_type> <id:IDENTIFIER> =>? {
+        match ty {
+            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+            NumType::Int => SymbolTable::add_symbol(IntDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+        }.or_else(|decl_err| {
+            SymbolTable::set_decl_error(decl_err);
+            Err(ParseError::User {
+                error: "Encountered declaration error!",
+            })
+        })
+    },
+};
+
+param_decl_tail: () = {
+    "," param_decl param_decl_tail,
+    empty,
+};
+
+func_declarations: () = {
+    func_decl func_declarations,
+    empty,
+};
+
+func_decl: () = {
+    start_func "("param_decl_list")" BEGIN func_body end_func,
+};
+
+start_func: () = {
+    FUNCTION any_type <id:IDENTIFIER> => {
+        SymbolTable::add_scope(id);
+    },
+};
+
+end_func: () = {
+    END => {
+        SymbolTable::end_curr_scope();
+    },
+};
+
+func_body: () = {
+    decl stmt_list,
+};
+
+stmt_list: () = {
+    stmt stmt_list,
+    empty,
+};
+
+stmt: () = {
+    base_stmt,
+    if_stmt,
+    for_stmt,
+};
+
+base_stmt: () = {
+    assign_stmt,
+    read_stmt,
+    write_stmt,
+    return_stmt,
+};
+
+assign_stmt: () = {
+    assign_expr ";",
+};
+
+assign_expr: () = {
+    IDENTIFIER ":=" expr,
+};
+
+read_stmt: () = {
+    READ "(" id_list ")" ";",
+};
+
+write_stmt: () = {
+    WRITE "(" id_list ")" ";"
+};
+
+return_stmt: () = {
+    RETURN expr ";"
+};
+
+expr: () = {
+    expr_prefix factor,
+};
+
+expr_prefix: () = {
+    expr_prefix factor addop,
+    empty,
+};
+
+factor: () = {
+    factor_prefix postfix_expr,
+};
+
+factor_prefix: () = {
+    factor_prefix postfix_expr mulop,
+    empty,
+};
+
+postfix_expr: () = {
+    primary,
+    call_expr,
+};
+
+call_expr: () = {
+    IDENTIFIER "(" expr_list ")",
+};
+
+expr_list: () = {
+    expr expr_list_tail,
+    empty,
+};
+
+expr_list_tail: () = {
+    "," expr expr_list_tail,
+    empty,
+};
+
+primary: () = {
+    "(" expr ")",
+    IDENTIFIER,
+    INTLITERAL,
+    FLOATLITERAL,
+};
+
+addop: () = {
+    "+",
+    "-",
+};
+
+mulop: () = {
+    "*",
+    "/",
+};
+
+if_stmt: () = {
+    start_if "(" cond ")" decl stmt_list else_part end_if_or_else,
+};
+
+start_if: () = {
+    IF => {
+        SymbolTable::add_anonymous_scope();
+    },
+};
+
+end_if_or_else: () = {
+    FI => {
+        SymbolTable::end_curr_scope();
+    },
+};
+
+else_part: () = {
+    start_else decl stmt_list,
+    empty,
+};
+
+start_else: () = {
+    ELSE => {
+        // End corresponding IF block, which should
+        // at this point be the curr scope.
+        SymbolTable::end_curr_scope();
+        SymbolTable::add_anonymous_scope();
+    },
+};
+
+cond: () = {
+    expr compop expr,
+};
+
+compop: () = {
+    "<",
+    ">",
+    "=",
+    "!=",
+    "<=",
+    ">=",
+};
+
+init_stmt: () = {
+    assign_expr,
+    empty,
+};
+
+incr_stmt: () = {
+    assign_expr,
+    empty,
+};
+
+for_stmt: () = {
+    start_for "(" init_stmt ";" cond ";" incr_stmt ")" decl stmt_list end_for,
+};
+
+start_for: () = {
+    FOR => {
+        SymbolTable::add_anonymous_scope();
+    },
+};
+
+end_for: () = {
+    ROF => {
+        SymbolTable::end_curr_scope();
+    },
+};

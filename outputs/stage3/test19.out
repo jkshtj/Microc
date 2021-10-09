@@ -1,0 +1,13 @@
+Symbol table GLOBAL
+name dummy type STRING value "abcde"
+name i type INT
+name j type INT
+name k type INT
+
+Symbol table main
+
+Symbol table BLOCK 1
+
+Symbol table BLOCK 2
+
+Symbol table BLOCK 3

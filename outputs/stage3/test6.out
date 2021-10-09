@@ -1,0 +1,23 @@
+Symbol table GLOBAL
+name a type INT
+name b type INT
+name c type INT
+name x type INT
+name y type INT
+name z type INT
+name h type INT
+name j type INT
+name k type INT
+
+Symbol table printout
+name a type INT
+name b type INT
+name c type INT
+
+Symbol table main
+
+Symbol table BLOCK 1
+
+Symbol table BLOCK 2
+
+Symbol table BLOCK 3

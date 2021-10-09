@@ -1,0 +1,22 @@
+PROGRAM test
+BEGIN
+	INT a,b,c,x,y,z,h,j,k;
+	FUNCTION VOID printout (INT a,INT b,INT c)
+	BEGIN
+		WRITE (a);
+		WRITE (b);
+		WRITE (c);
+	END
+  FUNCTION INT main()
+	BEGIN
+	--This line should cause parse error
+	IF (a + b)
+		
+		h:=0;
+	ELSE
+	
+		j:=1;
+	FI
+	RETURN a+b;
+	END
+END

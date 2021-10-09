@@ -1,0 +1,22 @@
+PROGRAM test BEGIN
+	INT a,b,c;
+	FLOAT x,y,z;
+	VOID h,j,k;
+	
+	FUNCTION INT function1()
+	BEGIN
+	RETURN 35*45;
+	END
+	FUNCTION INT function2()
+	BEGIN
+		RETURN function2();
+	END
+	FUNCTION INT main()
+	BEGIN
+	WRITE (a);
+	READ (b);
+	a := function1();
+	c := function2();
+	c:=a+b;
+	END
+END

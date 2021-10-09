@@ -1,0 +1,23 @@
+Symbol table GLOBAL
+name str type STRING value "test"
+name a type INT
+name b type INT
+name c type INT
+name g type INT
+name h type INT
+name i type INT
+name j type INT
+name k type INT
+name l type INT
+name p type INT
+name o type INT
+name r type INT
+name u type INT
+name y type INT
+
+Symbol table main
+name a type INT
+
+Symbol table BLOCK 1
+
+Symbol table BLOCK 2

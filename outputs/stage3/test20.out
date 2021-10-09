@@ -1,0 +1,27 @@
+Symbol table GLOBAL
+name input type STRING value "Please input an integer number: "
+name space type STRING value " "
+name eol type STRING value "\n"
+
+Symbol table F
+name n type INT
+name n1 type INT
+
+Symbol table BLOCK 1
+
+Symbol table BLOCK 2
+
+Symbol table BLOCK 3
+
+Symbol table BLOCK 4
+
+Symbol table BLOCK 5
+
+Symbol table BLOCK 6
+
+Symbol table main
+name i type INT
+name end type INT
+name result type INT
+
+Symbol table BLOCK 7

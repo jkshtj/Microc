@@ -1,0 +1,25 @@
+PROGRAM test
+BEGIN
+	STRING str := "test";
+	INT a,b,c,g,h,i,j,k,l,p,o,r,u,y;
+
+
+	FUNCTION INT main(INT a)
+	BEGIN
+	
+	
+	
+     i := 10;
+     j := 10;
+	
+    FOR(b := 1; b <= (i - 1); b := b + 1)            
+        FOR (a := 1; a <= (j - 1); a := a + 1)
+        ROF
+    ROF
+
+     WRITE(a);
+
+	RETURN a+b;
+	END
+END
+

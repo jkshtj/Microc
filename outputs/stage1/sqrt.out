@@ -1,0 +1,307 @@
+Token Type: KEYWORD
+Value: PROGRAM
+Token Type: IDENTIFIER
+Value: sqrt
+Token Type: KEYWORD
+Value: BEGIN
+Token Type: KEYWORD
+Value: STRING
+Token Type: IDENTIFIER
+Value: dummy
+Token Type: OPERATOR
+Value: :=
+Token Type: STRINGLITERAL
+Value: "abcde"
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FLOAT
+Token Type: IDENTIFIER
+Value: n
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FLOAT
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: ,
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FLOAT
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: ,
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FLOAT
+Token Type: IDENTIFIER
+Value: error
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: INT
+Token Type: IDENTIFIER
+Value: i
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FUNCTION
+Token Type: KEYWORD
+Value: VOID
+Token Type: IDENTIFIER
+Value: main
+Token Type: OPERATOR
+Value: (
+Token Type: OPERATOR
+Value: )
+Token Type: KEYWORD
+Value: BEGIN
+Token Type: IDENTIFIER
+Value: error
+Token Type: OPERATOR
+Value: :=
+Token Type: FLOATLITERAL
+Value: 0.001
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: READ
+Token Type: OPERATOR
+Value: (
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: )
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: n
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: :=
+Token Type: FLOATLITERAL
+Value: 2.0
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: /
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: FOR
+Token Type: OPERATOR
+Value: (
+Token Type: IDENTIFIER
+Value: i
+Token Type: OPERATOR
+Value: :=
+Token Type: INTLITERAL
+Value: 0
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: i
+Token Type: OPERATOR
+Value: <
+Token Type: INTLITERAL
+Value: 2
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: i
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: i
+Token Type: OPERATOR
+Value: +
+Token Type: INTLITERAL
+Value: 1
+Token Type: OPERATOR
+Value: )
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: n
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: :=
+Token Type: FLOATLITERAL
+Value: 2.0
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: /
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: ROF
+Token Type: KEYWORD
+Value: FOR
+Token Type: OPERATOR
+Value: (
+Token Type: OPERATOR
+Value: ;
+Token Type: OPERATOR
+Value: (
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: )
+Token Type: OPERATOR
+Value: >
+Token Type: IDENTIFIER
+Value: error
+Token Type: OPERATOR
+Value: ;
+Token Type: OPERATOR
+Value: )
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: n
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: :=
+Token Type: FLOATLITERAL
+Value: 2.0
+Token Type: OPERATOR
+Value: *
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: ;
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: :=
+Token Type: IDENTIFIER
+Value: x1
+Token Type: OPERATOR
+Value: -
+Token Type: IDENTIFIER
+Value: fx
+Token Type: OPERATOR
+Value: /
+Token Type: IDENTIFIER
+Value: dfx
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: ROF
+Token Type: KEYWORD
+Value: WRITE
+Token Type: OPERATOR
+Value: (
+Token Type: IDENTIFIER
+Value: x2
+Token Type: OPERATOR
+Value: )
+Token Type: OPERATOR
+Value: ;
+Token Type: KEYWORD
+Value: END
+Token Type: KEYWORD
+Value: END
+

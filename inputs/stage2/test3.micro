@@ -1,0 +1,11 @@
+PROGRAM test BEGIN
+	INT a,b,c;
+	FLOAT x,y,z;
+	VOID h,j,k;
+     --This line should cause a parse error
+	FUNCTION INT main() BEGIN
+	WRITE (a);
+	READ (b);
+	END
+	INT o,p;
+END

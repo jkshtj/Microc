@@ -1,0 +1,15 @@
+PROGRAM test
+BEGIN
+	STRING str := "test";
+	INT a,b,c,g,h,i,j,k,l,p,o,r,u,y;
+
+
+	FUNCTION INT main(VOID a)
+	BEGIN
+	
+--	a+b;
+
+	RETURN a+b;
+	END
+END
+

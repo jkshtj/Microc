@@ -1,0 +1,21 @@
+[package]
+name = "microc"
+version = "0.1.0"
+authors = ["Kshitij Jain <jkshtj@amazon.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+lalrpop = "0.19.6"
+
+[dependencies]
+atomic_refcell = "0.1.7"
+derive_more = { version = "0.99.0", features = ["display"] }
+flexi_logger = "0.19.4"
+getset = "0.1.1"
+lalrpop-util = "0.19.6"
+lazy_static = "1.4.0"
+regex = "1.5.4"
+tracing = { version = "0.1.28", features = ["log-always"] }
+

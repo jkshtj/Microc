@@ -1,0 +1,25 @@
+PROGRAM nested
+BEGIN
+
+    STRING dummy := "abcde";  --This is dummy to satisfy the grammar
+
+    INT i, j, k;
+     
+    FUNCTION VOID main()
+    BEGIN
+        i := 0;
+        j := 0;
+        k := 0;
+        result := 0;
+
+        FOR ( ; i <= 99; i := i + 1)
+            FOR ( ; j <= 99; j := j + 1)
+                FOR ( ; k < 100; k := k + 1)
+                    result := result + 1;
+                ROF
+            ROF
+        ROF
+
+        WRITE (result);
+    END
+END

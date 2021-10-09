@@ -1,0 +1,16 @@
+PROGRAM test
+BEGIN
+	STRING str := "test";
+	INT a,b,c,g,h,i,j,k,l,p,o,r,u,y;
+
+
+	--PROTO INT main();
+	FUNCTION INT main()
+	BEGIN
+	--This line should cause parse error
+	a+b;
+
+	RETURN a+b;
+	END
+END
+
