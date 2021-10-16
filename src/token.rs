@@ -92,18 +92,9 @@ pub enum Token {
     COMMA(TokenType, &'static str),
 }
 
-impl Token {
-    pub fn get_name_if_identifier(&self) -> Option<&str> {
-        match self {
-            Token::IDENTIFIER(_, name) => Some(name),
-            _ => None,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::ast::token::{Token, TokenType};
+    use crate::token::{Token, TokenType};
 
     #[test]
     fn token_returns_correct_value() {

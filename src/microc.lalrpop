@@ -1,8 +1,8 @@
-use crate::symbol_table::SymbolTable;
-use crate::ast::NumType;
-use crate::ast::token::{Token as MicrocToken, TokenType};
-use crate::ast::decl::{StringDecl, IntDecl, FloatDecl};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp};
+use crate::symbol_table::{SymbolTable, NumType};
+use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
+use std::str::FromStr;
 
 grammar;
 
@@ -86,8 +86,8 @@ decl: () = {
 string_decl: () = {
     STRING <id:IDENTIFIER> ":=" <val:STRINGLITERAL> ";" =>? {
         SymbolTable::add_symbol(StringDecl::new(
-            MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()),
-            MicrocToken::STRINGLITERAL(TokenType::LITERAL, val.to_owned())
+            id.to_owned(),
+            val.to_owned()
         )).or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
@@ -101,8 +101,8 @@ var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
-                NumType::Int => SymbolTable::add_symbol(IntDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned())),
+                NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned())),
             }.or_else(|decl_err| {
                 SymbolTable::set_decl_error(decl_err);
                 Err(ParseError::User {
@@ -141,8 +141,8 @@ param_decl_list: () = {
 param_decl: () = {
     <ty:var_type> <id:IDENTIFIER> =>? {
         match ty {
-            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
-            NumType::Int => SymbolTable::add_symbol(IntDecl::new(MicrocToken::IDENTIFIER(TokenType::IDENTIFIER, id.to_owned()))),
+            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned())),
+            NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned())),
         }.or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
@@ -204,47 +204,177 @@ assign_stmt: () = {
     assign_expr ";",
 };
 
-assign_expr: () = {
-    IDENTIFIER ":=" expr,
+assign_expr: AstNode = {
+    <id: IDENTIFIER> ":=" <expr: expr> => {
+        let lhs = Box::new(AstNode::Identifier {
+            id: id.to_string(),
+            sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+        });
+
+        let rhs = Box::new(expr);
+
+        let result = AstNode::AssignExpr {
+            lhs,
+            rhs,
+        };
+        println!("{:?}", result);
+        result
+    },
 };
 
-read_stmt: () = {
-    READ "(" id_list ")" ";",
+read_stmt: AstNode = {
+    READ "(" <id_list> ")" ";" => {
+        let id_list: Vec<AstNode> = <>
+        .iter()
+        .map(|id| {
+            AstNode::Identifier {
+                id: id.to_string(),
+                sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+            }
+        })
+        .collect();
+
+        let result = AstNode::ReadExpr(id_list);
+        println!("{:?}", result);
+        result
+    },
 };
 
-write_stmt: () = {
-    WRITE "(" id_list ")" ";"
+write_stmt: AstNode = {
+    WRITE "(" <id_list> ")" ";" => {
+        let id_list: Vec<AstNode> = <>
+        .iter()
+        .map(|id| {
+            AstNode::Identifier {
+                id: id.to_string(),
+                sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+            }
+        })
+        .collect();
+
+        let result = AstNode::WriteExpr(id_list);
+        println!("{:?}", result);
+        result
+    },
 };
 
 return_stmt: () = {
     RETURN expr ";"
 };
 
-expr: () = {
-    expr_prefix factor,
+expr: AstNode = {
+    <mut expr_prefix: expr_prefix> <factor: factor> => {
+        if let AstNode::AddExpr {
+            op: _,
+            lhs: _,
+            ref mut rhs,
+        } = &mut expr_prefix {
+            *rhs = Box::new(factor);
+            expr_prefix
+        } else {
+            factor
+        }
+    },
 };
 
-expr_prefix: () = {
-    expr_prefix factor addop,
-    empty,
+expr_prefix: AstNode = {
+    <mut expr_prefix: expr_prefix> <factor: factor> <mut addop: addop> => {
+        println!("EXPR_PREFIX: {:?}", expr_prefix);
+        println!("FACTOR: {:?}", factor);
+        match expr_prefix {
+            AstNode::None => {
+                if let AstNode::AddExpr {
+                    op: _,
+                    ref mut lhs,
+                    rhs: _,
+                } = &mut addop {
+                    *lhs = Box::new(factor);
+                }
+            },
+            _ => {
+                if let AstNode::AddExpr {
+                    op: _,
+                    lhs: _,
+                    ref mut rhs,
+                } = &mut expr_prefix {
+                    *rhs = Box::new(factor);
+                }
+
+                if let AstNode::AddExpr {
+                    op: _,
+                    ref mut lhs,
+                    rhs: _,
+                } = &mut addop {
+                    *lhs = Box::new(expr_prefix);
+                }
+            },
+        }
+
+        let result = addop;
+        println!("RETURNING: {:?}", result);
+        result
+    },
+    empty => AstNode::None,
 };
 
-factor: () = {
-    factor_prefix postfix_expr,
+factor: AstNode = {
+    <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> => {
+        if let AstNode::MulExpr {
+            op: _,
+            lhs: _,
+            ref mut rhs,
+        } = &mut factor_prefix {
+            *rhs = Box::new(postfix_expr);
+            factor_prefix
+        } else {
+            postfix_expr
+        }
+    },
 };
 
-factor_prefix: () = {
-    factor_prefix postfix_expr mulop,
-    empty,
+factor_prefix: AstNode = {
+    <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> <mut mulop: mulop> => {
+        match factor_prefix {
+            AstNode::None => {
+                if let AstNode::MulExpr {
+                    op: _,
+                    ref mut lhs,
+                    rhs: _,
+                } = &mut mulop {
+                    *lhs = Box::new(postfix_expr);
+                }
+            },
+            _ => {
+                if let AstNode::MulExpr {
+                    op: _,
+                    lhs: _,
+                    ref mut rhs,
+                } = &mut factor_prefix {
+                    *rhs = Box::new(postfix_expr);
+                }
+
+                if let AstNode::MulExpr {
+                    op: _,
+                    ref mut lhs,
+                    rhs: _,
+                } = &mut mulop {
+                    *lhs = Box::new(factor_prefix);
+                }
+            },
+        }
+
+        mulop
+    },
+    empty => AstNode::None,
 };
 
-postfix_expr: () = {
+postfix_expr: AstNode = {
     primary,
     call_expr,
 };
 
-call_expr: () = {
-    IDENTIFIER "(" expr_list ")",
+call_expr: AstNode = {
+    IDENTIFIER "(" expr_list ")" => AstNode::IntLiteral(42), // TODO: Fixme!
 };
 
 expr_list: () = {
@@ -257,21 +387,58 @@ expr_list_tail: () = {
     empty,
 };
 
-primary: () = {
-    "(" expr ")",
-    IDENTIFIER,
-    INTLITERAL,
-    FLOATLITERAL,
+primary: AstNode = {
+    "(" <expr> ")",
+    <IDENTIFIER> => {
+        // TODO: Handle failure case when symbol does not exist
+        let sym_type = SymbolTable::symbol_type_for(<>).unwrap();
+        AstNode::Identifier {
+            id: <>.to_string(),
+            sym_type
+        }
+    },
+    <INTLITERAL> => {
+        // TODO: Handle parsing failures
+        AstNode::IntLiteral(i32::from_str(<>).unwrap())
+    },
+    <FLOATLITERAL> => {
+        // TODO: Handle parsing failures
+        AstNode::FloatLiteral(f64::from_str(<>).unwrap())
+    },
 };
 
-addop: () = {
-    "+",
-    "-",
+addop: AstNode = {
+    "+" => {
+        AstNode::AddExpr {
+            op: AddOp::Add,
+            lhs: Box::new(AstNode::None),
+            rhs: Box::new(AstNode::None),
+        }
+    },
+    "-" => {
+       AstNode::AddExpr {
+           op: AddOp::Sub,
+           lhs: Box::new(AstNode::None),
+           rhs: Box::new(AstNode::None),
+       }
+   },
 };
 
-mulop: () = {
-    "*",
-    "/",
+mulop: AstNode = {
+    "*" => {
+       AstNode::MulExpr {
+           op: MulOp::Mul,
+           lhs: Box::new(AstNode::None),
+           rhs: Box::new(AstNode::None),
+       }
+   },
+    "/" => {
+      AstNode::MulExpr {
+          op: MulOp::Div,
+          lhs: Box::new(AstNode::None),
+          rhs: Box::new(AstNode::None),
+      }
+   },
 };
 
 if_stmt: () = {

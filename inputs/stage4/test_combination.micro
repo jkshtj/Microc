@@ -1,0 +1,21 @@
+PROGRAM p
+BEGIN
+
+	INT a,b,c;
+	
+	FUNCTION VOID main()
+	BEGIN
+		a := 20;
+		b := 30;
+		c := 40;
+
+		c := c + a*b + (a*b+c)/a + 20;
+		b := b*b + a;
+		a := (b*a)/a;
+
+		WRITE (c);
+		WRITE (b);
+		WRITE (a);
+
+	END
+END

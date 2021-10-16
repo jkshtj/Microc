@@ -1,0 +1,107 @@
+;Current temp: null
+;IR Code: 
+;STOREI 20 $T1
+;STOREI $T1 a Incoming: [STOREI 20 $T1] 
+;STOREI 30 $T2 Incoming: [STOREI $T1 a] 
+;STOREI $T2 b Incoming: [STOREI 30 $T2] 
+;STOREI 40 $T3 Incoming: [STOREI $T2 b] 
+;STOREI $T3 c Incoming: [STOREI 40 $T3] 
+;MULTI a b $T4 Incoming: [STOREI $T3 c] 
+;ADDI c $T4 $T5 Incoming: [MULTI a b $T4] 
+;MULTI a b $T6 Incoming: [ADDI c $T4 $T5] 
+;ADDI $T6 c $T7 Incoming: [MULTI a b $T6] 
+;DIVI $T7 a $T8 Incoming: [ADDI $T6 c $T7] 
+;ADDI $T5 $T8 $T9 Incoming: [DIVI $T7 a $T8] 
+;STOREI 20 $T10 Incoming: [ADDI $T5 $T8 $T9] 
+;ADDI $T9 $T10 $T11 Incoming: [STOREI 20 $T10] 
+;STOREI $T11 c Incoming: [ADDI $T9 $T10 $T11] 
+;MULTI b b $T12 Incoming: [STOREI $T11 c] 
+;ADDI $T12 a $T13 Incoming: [MULTI b b $T12] 
+;STOREI $T13 b Incoming: [ADDI $T12 a $T13] 
+;MULTI b a $T14 Incoming: [STOREI $T13 b] 
+;DIVI $T14 a $T15 Incoming: [MULTI b a $T14] 
+;STOREI $T15 a Incoming: [DIVI $T14 a $T15] 
+;WRITEI c Incoming: [STOREI $T15 a] 
+;WRITES newline Incoming: [WRITEI c] 
+;WRITEI b Incoming: [WRITES newline] 
+;WRITES newline Incoming: [WRITEI b] 
+;WRITEI a Incoming: [WRITES newline] 
+;WRITES newline Incoming: [WRITEI a] 
+;STOREF 2.5 $T16 Incoming: [WRITES newline] 
+;STOREF $T16 p Incoming: [STOREF 2.5 $T16] 
+;STOREF 1.2 $T17 Incoming: [STOREF $T16 p] 
+;STOREF $T17 s Incoming: [STOREF 1.2 $T17] 
+;STOREF 0.7 $T18 Incoming: [STOREF $T17 s] 
+;STOREF $T18 t Incoming: [STOREF 0.7 $T18] 
+;MULTF t p $T19 Incoming: [STOREF $T18 t] 
+;SUBF $T19 s $T20 Incoming: [MULTF t p $T19] 
+;MULTF p s $T21 Incoming: [SUBF $T19 s $T20] 
+;ADDF $T20 $T21 $T22 Incoming: [MULTF p s $T21] 
+;STOREF $T22 t Incoming: [ADDF $T20 $T21 $T22] 
+;WRITEF t Incoming: [STOREF $T22 t] 
+;WRITES newline Incoming: [WRITEF t] 
+
+var a
+var b
+var c
+var p
+var s
+var t
+str newline "\n"
+move 20 r0 ;STOREI 20 $T1
+move r0 a ;STOREI $T1 a
+move 30 r1 ;STOREI 30 $T2
+move r1 b ;STOREI $T2 b
+move 40 r2 ;STOREI 40 $T3
+move r2 c ;STOREI $T3 c
+move a r3 ;MULTI a b $T4
+muli b r3 ;MULTI a b $T4
+move c r4 ;ADDI c $T4 $T5
+addi r3 r4 ;ADDI c $T4 $T5
+move a r5 ;MULTI a b $T6
+muli b r5 ;MULTI a b $T6
+move r5 r6 ;ADDI $T6 c $T7
+addi c r6 ;ADDI $T6 c $T7
+move r6 r7 ;DIVI $T7 a $T8
+divi a r7 ;DIVI $T7 a $T8
+move r4 r8 ;ADDI $T5 $T8 $T9
+addi r7 r8 ;ADDI $T5 $T8 $T9
+move 20 r9 ;STOREI 20 $T10
+move r8 r10 ;ADDI $T9 $T10 $T11
+addi r9 r10 ;ADDI $T9 $T10 $T11
+move r10 c ;STOREI $T11 c
+move b r11 ;MULTI b b $T12
+muli b r11 ;MULTI b b $T12
+move r11 r12 ;ADDI $T12 a $T13
+addi a r12 ;ADDI $T12 a $T13
+move r12 b ;STOREI $T13 b
+move b r13 ;MULTI b a $T14
+muli a r13 ;MULTI b a $T14
+move r13 r14 ;DIVI $T14 a $T15
+divi a r14 ;DIVI $T14 a $T15
+move r14 a ;STOREI $T15 a
+sys writei c ;WRITEI c
+sys writes newline ;WRITES newline
+sys writei b ;WRITEI b
+sys writes newline ;WRITES newline
+sys writei a ;WRITEI a
+sys writes newline ;WRITES newline
+move 2.5 r15 ;STOREF 2.5 $T16
+move r15 p ;STOREF $T16 p
+move 1.2 r16 ;STOREF 1.2 $T17
+move r16 s ;STOREF $T17 s
+move 0.7 r17 ;STOREF 0.7 $T18
+move r17 t ;STOREF $T18 t
+move t r18 ;MULTF t p $T19
+mulr p r18 ;MULTF t p $T19
+move r18 r19 ;SUBF $T19 s $T20
+subr s r19 ;SUBF $T19 s $T20
+move p r20 ;MULTF p s $T21
+mulr s r20 ;MULTF p s $T21
+move r19 r21 ;ADDF $T20 $T21 $T22
+addr r20 r21 ;ADDF $T20 $T21 $T22
+move r21 t ;STOREF $T22 t
+sys writer t ;WRITEF t
+sys writes newline ;WRITES newline
+sys halt
+

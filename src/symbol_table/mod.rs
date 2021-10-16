@@ -1,10 +1,13 @@
 #![allow(unused)]
 
-use crate::ast::decl::{StringDecl, IntDecl, FloatDecl};
-use atomic_refcell::AtomicRefCell;
-use std::fmt::{Debug, Display, Formatter};
+pub mod decl;
+
 use std::collections::HashSet;
+use std::fmt::{Debug, Display, Formatter};
+
+use atomic_refcell::AtomicRefCell;
 use getset::Getters;
+use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 
 lazy_static::lazy_static! {
     pub static ref SYMBOL_TABLE: AtomicRefCell<SymbolTable> = AtomicRefCell::new(SymbolTable::new());
@@ -67,9 +70,7 @@ impl SymbolTable {
 
     pub fn add_anonymous_scope() {
         if let Ok(mut symbol_table) = SYMBOL_TABLE.try_borrow_mut() {
-            // Unwrapping here should be safe as we never create a
-            // SymbolTable without setting an active scope.
-            let active_scope_id = *symbol_table.active_scope_stack.last().unwrap();
+            let active_scope_id = symbol_table.active_scope_id();
 
             symbol_table.anonymous_scope_counter += 1;
             let anonymous_scope_name = format!("BLOCK{}", symbol_table.anonymous_scope_counter);
@@ -85,9 +86,7 @@ impl SymbolTable {
 
     pub fn add_scope<T: ToString + Debug>(name: T) {
         if let Ok(mut symbol_table) = SYMBOL_TABLE.try_borrow_mut() {
-            // Unwrapping here should be safe as we never create a
-            // SymbolTable without setting an active scope.
-            let active_scope_id = *symbol_table.active_scope_stack.last().unwrap();
+            let active_scope_id = symbol_table.active_scope_id();
 
             let new_scope = Scope::new(name, Some(active_scope_id));
             symbol_table.scope_tree.push(new_scope);
@@ -107,17 +106,9 @@ impl SymbolTable {
         }
     }
 
-    // TODO: Improve error type
     pub fn add_symbol<T: Into<Symbol> + Debug>(symbol: T) -> Result<(), DeclarationError> {
         if let Ok(mut symbol_table) = SYMBOL_TABLE.try_borrow_mut() {
-            // Unwrapping here should be safe as we never create a
-            // SymbolTable without setting an active scope.
-            let active_scope_id = *symbol_table.active_scope_stack.last().unwrap();
-
-            // Unwrapping here should be safe as we always insert a
-            // scope into the scope tree before inserting its id
-            // into the active scope stack.
-            let active_scope = symbol_table.scope_tree.get_mut(active_scope_id).unwrap();
+            let active_scope = symbol_table.active_scope_mut();
             active_scope.add_symbol(symbol.into())?;
         } else {
             todo!("Log a message/error")
@@ -126,7 +117,62 @@ impl SymbolTable {
         Ok(())
     }
 
-    pub fn print_symbol_table() {
+    // TODO: Should this return a `Result`?
+    pub fn symbol_type_for(symbol_name: &str) -> Option<SymbolType> {
+        if let Ok(symbol_table) = SYMBOL_TABLE.try_borrow() {
+            let global_scope = symbol_table.global_scope();
+
+            global_scope.symbol_type(symbol_name).or_else(|| {
+                let active_scope = symbol_table.active_scope();
+                active_scope.symbol_type(symbol_name)
+            })
+        } else {
+            todo!("Log a message/error")
+        }
+    }
+
+    fn global_scope(&self) -> &Scope {
+        // Unwrapping here should be safe as we never initialize a
+        // symbol table without a global scope.
+        self.scope_tree.first().unwrap()
+    }
+
+    fn global_scope_mut(&mut self) -> &mut Scope {
+        // Unwrapping here should be safe as we never initialize a
+        // symbol table without a global scope.
+        self.scope_tree.first_mut().unwrap()
+    }
+
+    fn active_scope(&self) -> &Scope {
+        // Unwrapping here should be safe as we never create a
+        // SymbolTable without setting an active scope.
+        let active_scope_id = *self.active_scope_stack.last().unwrap();
+
+        // Unwrapping here should be safe as we always insert a
+        // scope into the scope tree before inserting its id
+        // into the active scope stack.
+        self.scope_tree.get(active_scope_id).unwrap()
+    }
+
+    fn active_scope_mut(&mut self) -> &mut Scope {
+        // Unwrapping here should be safe as we never create a
+        // SymbolTable without setting an active scope.
+        let active_scope_id = *self.active_scope_stack.last().unwrap();
+
+        // Unwrapping here should be safe as we always insert a
+        // scope into the scope tree before inserting its id
+        // into the active scope stack.
+        self.scope_tree.get_mut(active_scope_id).unwrap()
+    }
+
+    fn active_scope_id(&self) -> usize {
+        // Unwrapping here should be safe as we never create a
+        // SymbolTable without setting an active scope.
+        *self.active_scope_stack.last().unwrap()
+    }
+
+    #[cfg(test)]
+    fn print_symbol_table() {
         if let Ok(symbol_table) = SYMBOL_TABLE.try_borrow() {
             println!("{}", &*symbol_table);
         } else {
@@ -198,15 +244,32 @@ impl Scope {
         }
     }
 
-    // TODO: Improve error type
     fn add_symbol(&mut self, symbol: Symbol) -> Result<(), DeclarationError> {
         let symbol_name = symbol.get_name();
-        if self.symbol_set.contains(symbol_name) {
+        if self.contains_symbol(symbol_name) {
             return Err(DeclarationError::new(self.name.clone(), symbol_name.to_string()));
         }
         self.symbol_set.insert(symbol_name.to_owned());
         self.symbols.push(symbol);
         Ok(())
+    }
+
+    // TODO: Should this return a `Result`?
+    // TODO: Do we need to store symbols in a Vec?
+    //  Or was it just a requirement in stage3?
+    fn symbol_type(&self, symbol_name: &str) -> Option<SymbolType> {
+        self.symbols
+            .iter()
+            .find(|&symbol| symbol.get_name() == symbol_name)
+            .map(|symbol| match symbol {
+                Symbol::String(_) => SymbolType::String,
+                Symbol::Int(_) => SymbolType::Num(NumType::Int),
+                Symbol::Float(_) => SymbolType::Num(NumType::Float),
+            })
+    }
+
+    fn contains_symbol(&self, symbol_name: &str) -> bool {
+        self.symbol_set.contains(symbol_name)
     }
 }
 
@@ -230,19 +293,44 @@ impl Symbol {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum SymbolType {
+    String,
+    Num(NumType),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum NumType {
+    Int,
+    Float
+}
+
 #[cfg(test)]
 mod test {
+    use crate::token::{Token, TokenType};
+    // Need serial tests because different tests
+    // modify the same symbol table.
+    use serial_test::serial;
     use super::*;
-    use crate::ast::token::{Token, TokenType};
+
+    fn setup() {
+        let mut symbol_table = SYMBOL_TABLE.borrow_mut();
+        *symbol_table = SymbolTable::new();
+    }
 
     #[test]
+    #[serial]
     fn first_access_to_symbol_table_works() {
+        setup();
         let symbol_table = SYMBOL_TABLE.borrow();
         println!("{:?}", symbol_table);
     }
 
     #[test]
+    #[serial]
     fn add_scope_works() {
+        setup();
+
         SymbolTable::add_scope("ChildOfGlobal");
         assert_eq!(2, SymbolTable::num_scopes());
 
@@ -251,7 +339,10 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn add_anonymous_scope_works() {
+        setup();
+
         assert!(SymbolTable::is_active_scope_name("GLOBAL"));
 
         SymbolTable::add_anonymous_scope();
@@ -280,17 +371,14 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn add_symbol_works() {
+        setup();
+
         let symbol_under_global = Symbol::String(StringDecl::new(
-            Token::IDENTIFIER(
-                TokenType::IDENTIFIER,
-                "global_symbol".to_owned(),
-            ),
-            Token::STRINGLITERAL(
-                TokenType::LITERAL,
-                "value1".to_owned(),
-            ))
-        );
+            "global_symbol".to_owned(),
+            "value1".to_owned(),
+        ));
 
         // Should be added under "GLOBAL" scope
         SymbolTable::add_symbol(symbol_under_global.clone());
@@ -300,19 +388,36 @@ mod test {
         assert_eq!(2, SymbolTable::num_scopes());
 
         let symbol_under_child_of_global = Symbol::String(StringDecl::new(
-            Token::IDENTIFIER(
-                TokenType::IDENTIFIER,
-                "child_of_global_symbol".to_owned(),
-            ),
-            Token::STRINGLITERAL(
-                TokenType::LITERAL,
-                "value1".to_owned(),
-            ))
-        );
+            "child_of_global_symbol".to_owned(),
+            "value1".to_owned(),
+        ));
 
         // Should be added under "ChildOfGlobal" scope
         SymbolTable::add_symbol(symbol_under_child_of_global.clone());
         assert!(SymbolTable::is_symbol_under(1, &symbol_under_child_of_global));
+    }
+
+    #[test]
+    #[serial]
+    fn symbol_type_works() {
+        setup();
+
+        let symbol_under_global = Symbol::String(StringDecl::new(
+            "global_symbol".to_owned(),
+            "value1".to_owned(),
+        ));
+        SymbolTable::add_symbol(symbol_under_global.clone());
+        assert_eq!(SymbolType::String, SymbolTable::symbol_type_for("global_symbol").unwrap());
+        assert!(SymbolTable::symbol_type_for("non_existent").is_none());
+
+        SymbolTable::add_scope("ChildOfGlobal");
+        let symbol_under_child_of_global = Symbol::String(StringDecl::new(
+            "child_of_global_symbol".to_owned(),
+            "value1".to_owned(),
+        ));
+        SymbolTable::add_symbol(symbol_under_child_of_global.clone());
+        assert_eq!(SymbolType::String, SymbolTable::symbol_type_for("child_of_global_symbol").unwrap());
+        assert!(SymbolTable::symbol_type_for("non_existent").is_none());
     }
 
     // TODO: Add test for testing symbol conflict in scope

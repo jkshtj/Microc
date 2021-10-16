@@ -1,0 +1,53 @@
+PROGRAM expr
+BEGIN
+
+	INT a,b,c,d;
+	FLOAT x,y,z,t;
+	STRING newline := "\n";
+
+	FUNCTION VOID main()
+	BEGIN
+		a := 1;
+		b := 2;
+		c := 10;
+		d := 20;
+
+		WRITE (a, newline);
+		WRITE (b, newline);
+		WRITE (c, newline);
+		WRITE (d, newline);
+		a := a + b;
+		WRITE (a, newline);
+		b := a * c;
+		WRITE (b, newline);
+		c := 0 - a + b;
+		WRITE (c, newline);
+		d := 0 - d;
+		WRITE (d, newline);
+		a := (a+b)*(d+c)-(a+b+c+d)/a;
+		WRITE (a, newline);
+		
+		a := a + 10;
+		WRITE (a, newline);
+		b := b + a + 10;
+		WRITE (b, newline);
+		c := 0 - 10;
+		WRITE (c, newline);
+		x := 1.0;
+		y := 2.0;
+		z := 3.14159;
+		WRITE (x, newline);
+		WRITE (z, newline);
+		WRITE (y, newline);
+		x := z/2.0;
+		y := z/y;
+		WRITE (x, newline);
+		WRITE (y, newline);
+		t := (x+y+z)/z;
+		WRITE (t, newline);
+		t := t*t;
+		WRITE (t, newline);
+		t := (t+z+t+t/2.0+z/4.0+z/5.0+z/6.0+z/7.0);
+		WRITE (t, newline);
+	END	
+END

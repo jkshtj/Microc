@@ -17,5 +17,6 @@ getset = "0.1.1"
 lalrpop-util = "0.19.6"
 lazy_static = "1.4.0"
 regex = "1.5.4"
+serial_test = "0.5.1"
 tracing = { version = "0.1.28", features = ["log-always"] }
 

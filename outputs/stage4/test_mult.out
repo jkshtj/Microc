@@ -1,0 +1,47 @@
+;IR code
+;LABEL main
+;LINK 
+;STOREI 1 $T1
+;STOREI $T1 a
+;STOREI 2 $T2
+;STOREI $T2 b
+;READI c
+;READI d
+;MULTI a c $T3
+;MULTI b d $T4
+;ADDI $T3 $T4 $T5
+;STOREI $T5 e
+;WRITEI c
+;WRITES newline
+;WRITEI d
+;WRITES newline
+;WRITEI e
+;WRITES newline
+;RET
+;tiny code
+var a
+var b
+var c
+var d
+var e
+str newline "\n"
+move 1 r0
+move r0 a
+move 2 r1
+move r1 b
+sys readi c 
+sys readi d 
+move a r2
+muli c r2
+move b r3
+muli d r3
+move r2 r4
+addi r3 r4
+move r4 e
+sys writei c
+sys writes newline
+sys writei d
+sys writes newline
+sys writei e
+sys writes newline
+sys halt

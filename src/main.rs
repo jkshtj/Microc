@@ -1,16 +1,18 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-mod symbol_table;
-mod ast;
-
-use crate::symbol_table::SYMBOL_TABLE;
-
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, ErrorKind, Read};
 use std::io;
+
 use flexi_logger::Logger;
+
+use crate::symbol_table::SYMBOL_TABLE;
+
+mod symbol_table;
+mod ast;
+mod token;
 
 lalrpop_mod!(pub microc);
 
@@ -48,18 +50,21 @@ fn main() {
         /*******************************/
 
         /* STAGE3 result verification */
-        let symbol_table = SYMBOL_TABLE.borrow();
-        let mut actual_result = format!("{}", &*symbol_table);
-        actual_result.retain(|x| !x.is_whitespace());
-        result.retain(|x| !x.is_whitespace());
+        // let symbol_table = SYMBOL_TABLE.borrow();
+        // let mut actual_result = format!("{}", &*symbol_table);
+        // actual_result.retain(|x| !x.is_whitespace());
+        // result.retain(|x| !x.is_whitespace());
+        //
+        // // println!("Actual result:\n {}", actual_result);
+        // // println!();
+        // // println!("Expected result:\n {}", result);
+        //
+        // assert_eq!(actual_result, result);
+        // println!("SUCCESS");
 
-        // println!("Actual result:\n {}", actual_result);
-        // println!();
-        // println!("Expected result:\n {}", result);
+        /*******************************/
 
-        assert_eq!(actual_result, result);
-        println!("SUCCESS");
-
+        /* STAGE4 result verification */
         /*******************************/
 
         Ok(())
