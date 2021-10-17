@@ -8,6 +8,7 @@ use std::fmt::{Debug, Display, Formatter};
 use atomic_refcell::AtomicRefCell;
 use getset::Getters;
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
+use crate::types::NumType;
 
 lazy_static::lazy_static! {
     pub static ref SYMBOL_TABLE: AtomicRefCell<SymbolTable> = AtomicRefCell::new(SymbolTable::new());
@@ -293,16 +294,10 @@ impl Symbol {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum SymbolType {
     String,
     Num(NumType),
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum NumType {
-    Int,
-    Float
 }
 
 #[cfg(test)]

@@ -160,6 +160,18 @@ impl CodeObject {
         }
     }
 
+    // TODO: Try implementing this Post-Order traversal recursively
+
+    // TODO: Reimplement conversion of AST to 3AC IR using visitor pattern
+    //  (https://rust-unofficial.github.io/patterns/patterns/behavioural/visitor.html)-
+    //  - There should be a `Visit` trait, with a visit_* method for each variant of the AST.
+    //  - 3AC should implement `Visit` to define what it does with each AST node that it sees.
+    //    That is pretty much exactly what I'm doing right now with the match statement.
+    //
+    // Note - Visitor pattern does not care about traversal strategy. For instance I can
+    //  traverse the AST using Pre-Order traversal and the visitor pattern will still apply.
+    //  In fact if my visitor did not have to return a value from each visit_* call, I could
+    //  have separated the traversal strategy into a separate method.
     pub fn walk_ast(ast: AstNode) -> Self {
         return match ast {
             AstNode::Id(identifier)  => {

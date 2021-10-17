@@ -1,12 +1,12 @@
-use crate::symbol_table::SymbolType;
+use crate::types::Identifier;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum AddOp {
     Add,
     Sub,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum MulOp {
     Mul,
     Div,
@@ -14,14 +14,11 @@ pub enum MulOp {
 
 #[derive(Debug)]
 pub enum AstNode {
-    Identifier {
-        id: String,
-        sym_type: SymbolType,
-    },
+    Id(Identifier),
     IntLiteral(i32),
     FloatLiteral(f64),
-    ReadExpr(Vec<AstNode>),
-    WriteExpr(Vec<AstNode>),
+    ReadExpr(Vec<Identifier>),
+    WriteExpr(Vec<Identifier>),
     AddExpr {
         op: AddOp,
         lhs: Box<AstNode>,
@@ -33,7 +30,7 @@ pub enum AstNode {
         rhs: Box<AstNode>,
     },
     AssignExpr {
-        lhs: Box<AstNode>,
+        lhs: Identifier,
         rhs: Box<AstNode>,
     },
     None,

@@ -1,18 +1,21 @@
+#![feature(box_into_inner)]
+mod symbol_table;
+mod ast;
+mod token;
+mod types;
+mod three_addr_code_ir;
+
 #[macro_use]
 extern crate lalrpop_util;
 
+use crate::symbol_table::SYMBOL_TABLE;
+use flexi_logger::Logger;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, ErrorKind, Read};
 use std::io;
-
-use flexi_logger::Logger;
-
-use crate::symbol_table::SYMBOL_TABLE;
-
-mod symbol_table;
-mod ast;
-mod token;
+use three_addr_code_ir::CodeObject;
+use crate::three_addr_code_ir::ThreeAddressCode;
 
 lalrpop_mod!(pub microc);
 
@@ -65,6 +68,16 @@ fn main() {
         /*******************************/
 
         /* STAGE4 result verification */
+        let mut result = program.unwrap();
+        result.reverse();
+        let three_addr_codes: Vec<ThreeAddressCode> = result
+            .into_iter()
+            .flat_map(|ast_node| CodeObject::walk_ast(ast_node).code_sequence)
+            .collect();
+
+        three_addr_codes
+            .iter()
+            .for_each(|code| println!("{}", code));
         /*******************************/
 
         Ok(())

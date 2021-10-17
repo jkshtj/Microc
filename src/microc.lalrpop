@@ -1,5 +1,6 @@
 use crate::ast::ast_node::{AstNode, AddOp, MulOp};
-use crate::symbol_table::{SymbolTable, NumType};
+use crate::symbol_table::SymbolTable;
+use crate::types::{NumType, Identifier};
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
 use std::str::FromStr;
@@ -61,8 +62,8 @@ match {
 //////////////////////////
 ///////// Grammar ////////
 //////////////////////////
-pub Program: () = {
-    PROGRAM IDENTIFIER BEGIN pgm_body end_program,
+pub Program: Vec<AstNode> = {
+    PROGRAM IDENTIFIER BEGIN <pgm_body> end_program,
 };
 
 end_program: () = {
@@ -73,8 +74,8 @@ end_program: () = {
 
 empty: () = ();
 
-pgm_body: () = {
-    decl func_declarations,
+pgm_body: Vec<AstNode> = {
+    decl <func_declarations>,
 };
 
 decl: () = {
@@ -157,13 +158,23 @@ param_decl_tail: () = {
     empty,
 };
 
-func_declarations: () = {
-    func_decl func_declarations,
-    empty,
+// TODO: For STAGE 4 only -
+//  Instead of returning a Vec<AstNode> this should
+//  return a variant of AstNode itself, in the future.
+//
+//  We're also just combining the ast nodes from all
+//  functions. It doesn't matter cause there will only
+// be one function in stage 4.
+func_declarations: Vec<AstNode> = {
+    <mut func_decl: func_decl> <mut func_declarations: func_declarations> => {
+        func_declarations.append(&mut func_decl);
+        func_declarations
+    },
+    empty => vec![],
 };
 
-func_decl: () = {
-    start_func "("param_decl_list")" BEGIN func_body end_func,
+func_decl: Vec<AstNode> = {
+    start_func "("param_decl_list")" BEGIN <func_body> end_func,
 };
 
 start_func: () = {
@@ -178,88 +189,88 @@ end_func: () = {
     },
 };
 
-func_body: () = {
-    decl stmt_list,
+func_body: Vec<AstNode> = {
+    decl <stmt_list>,
 };
 
-stmt_list: () = {
-    stmt stmt_list,
-    empty,
+// TODO: For STAGE 4 only -
+//  Instead of returning a Vec<AstNode> this should
+//  return a variant of AstNode itself, in the future.
+stmt_list: Vec<AstNode> = {
+    <stmt: stmt> <mut stmt_list: stmt_list> => {
+        stmt_list.push(stmt);
+        stmt_list
+     },
+    empty => vec![],
 };
 
-stmt: () = {
+stmt: AstNode = {
     base_stmt,
-    if_stmt,
-    for_stmt,
+    if_stmt => todo!(), // TODO: FIXME!
+    for_stmt => todo!(), // TODO: FIXME
 };
 
-base_stmt: () = {
+base_stmt: AstNode = {
     assign_stmt,
     read_stmt,
     write_stmt,
     return_stmt,
 };
 
-assign_stmt: () = {
-    assign_expr ";",
+assign_stmt: AstNode = {
+    <assign_expr> ";",
 };
 
 assign_expr: AstNode = {
     <id: IDENTIFIER> ":=" <expr: expr> => {
-        let lhs = Box::new(AstNode::Identifier {
+        let lhs = Identifier {
             id: id.to_string(),
             sym_type: SymbolTable::symbol_type_for(id).unwrap(),
-        });
+        };
 
         let rhs = Box::new(expr);
 
-        let result = AstNode::AssignExpr {
+        AstNode::AssignExpr {
             lhs,
             rhs,
-        };
-        println!("{:?}", result);
-        result
+        }
     },
 };
 
 read_stmt: AstNode = {
     READ "(" <id_list> ")" ";" => {
-        let id_list: Vec<AstNode> = <>
+        let id_list: Vec<Identifier> = <>
         .iter()
         .map(|id| {
-            AstNode::Identifier {
+            Identifier {
                 id: id.to_string(),
                 sym_type: SymbolTable::symbol_type_for(id).unwrap(),
             }
         })
         .collect();
 
-        let result = AstNode::ReadExpr(id_list);
-        println!("{:?}", result);
-        result
+        AstNode::ReadExpr(id_list)
     },
 };
 
 write_stmt: AstNode = {
     WRITE "(" <id_list> ")" ";" => {
-        let id_list: Vec<AstNode> = <>
+        let id_list: Vec<Identifier> = <>
         .iter()
         .map(|id| {
-            AstNode::Identifier {
+            Identifier {
                 id: id.to_string(),
                 sym_type: SymbolTable::symbol_type_for(id).unwrap(),
             }
         })
         .collect();
 
-        let result = AstNode::WriteExpr(id_list);
-        println!("{:?}", result);
-        result
+        AstNode::WriteExpr(id_list)
     },
 };
 
-return_stmt: () = {
-    RETURN expr ";"
+return_stmt: AstNode = {
+    RETURN <expr> ";",
 };
 
 expr: AstNode = {
@@ -279,8 +290,6 @@ expr: AstNode = {
 
 expr_prefix: AstNode = {
     <mut expr_prefix: expr_prefix> <factor: factor> <mut addop: addop> => {
-        println!("EXPR_PREFIX: {:?}", expr_prefix);
-        println!("FACTOR: {:?}", factor);
         match expr_prefix {
             AstNode::None => {
                 if let AstNode::AddExpr {
@@ -310,9 +319,7 @@ expr_prefix: AstNode = {
             },
         }
 
-        let result = addop;
-        println!("RETURNING: {:?}", result);
-        result
+        addop
     },
     empty => AstNode::None,
 };
@@ -392,10 +399,10 @@ primary: AstNode = {
     <IDENTIFIER> => {
         // TODO: Handle failure case when symbol does not exist
         let sym_type = SymbolTable::symbol_type_for(<>).unwrap();
-        AstNode::Identifier {
+        AstNode::Id(Identifier {
             id: <>.to_string(),
             sym_type
-        }
+        })
     },
     <INTLITERAL> => {
         // TODO: Handle parsing failures
