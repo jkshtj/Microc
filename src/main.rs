@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::{BufReader, ErrorKind, Read};
 use std::io;
 use three_addr_code_ir::CodeObject;
-use crate::three_addr_code_ir::ThreeAddressCode;
+use crate::three_addr_code_ir::{ThreeAddressCode, ThreeAddressCodeIR};
 
 lalrpop_mod!(pub microc);
 
@@ -69,10 +69,11 @@ fn main() {
 
         /* STAGE4 result verification */
         let mut result = program.unwrap();
+        let mut visitor = ThreeAddressCodeIR;
         result.reverse();
         let three_addr_codes: Vec<ThreeAddressCode> = result
             .into_iter()
-            .flat_map(|ast_node| CodeObject::walk_ast(ast_node).code_sequence)
+            .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
             .collect();
 
         three_addr_codes

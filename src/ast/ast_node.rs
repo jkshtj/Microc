@@ -35,3 +35,18 @@ pub enum AstNode {
     },
     None,
 }
+
+pub mod visit {
+    use super::*;
+
+    pub trait Visitor<T> {
+        fn visit_identifier(&mut self, id: Identifier) -> T;
+        fn visit_int_literal(&mut self, n: i32) -> T;
+        fn visit_float_literal(&mut self, n: f64) -> T;
+        fn visit_read_expression(&mut self, expr: Vec<Identifier>) -> T;
+        fn visit_write_expr(&mut self, expr: Vec<Identifier>) -> T;
+        fn visit_add_expr(&mut self, op: AddOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> T;
+        fn visit_mul_expr(&mut self, op: MulOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> T;
+        fn visit_assign_expr(&mut self, lhs: Identifier, rhs: Box<AstNode>) -> T;
+    }
+}

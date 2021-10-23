@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::ast::ast_node::{AstNode, AddOp, MulOp};
 use crate::symbol_table::SymbolType;
 use derive_more::Display;
+use crate::ast::ast_node::visit::Visitor;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -151,7 +152,10 @@ pub struct CodeObject {
     pub code_sequence: Vec<ThreeAddressCode>,
 }
 
-impl CodeObject {
+#[derive(Debug)]
+pub struct ThreeAddressCodeIR;
+
+impl ThreeAddressCodeIR {
     pub fn combined_result_type(left: ResultType, right: ResultType) -> ResultType {
         match (left, right) {
             (ResultType::Float, ResultType::Float) => ResultType::Float,
@@ -160,173 +164,184 @@ impl CodeObject {
         }
     }
 
-    // TODO: Try implementing this Post-Order traversal recursively
-
-    // TODO: Reimplement conversion of AST to 3AC IR using visitor pattern
-    //  (https://rust-unofficial.github.io/patterns/patterns/behavioural/visitor.html)-
-    //  - There should be a `Visit` trait, with a visit_* method for each variant of the AST.
-    //  - 3AC should implement `Visit` to define what it does with each AST node that it sees.
-    //    That is pretty much exactly what I'm doing right now with the match statement.
-    //
-    // Note - Visitor pattern does not care about traversal strategy. For instance I can
-    //  traverse the AST using Pre-Order traversal and the visitor pattern will still apply.
-    //  In fact if my visitor did not have to return a value from each visit_* call, I could
-    //  have separated the traversal strategy into a separate method.
-    pub fn walk_ast(ast: AstNode) -> Self {
+    pub fn walk_ast(&mut self, ast: AstNode) -> CodeObject {
         return match ast {
-            AstNode::Id(identifier)  => {
-                let result_type = identifier.sym_type.into();
-
-                CodeObject {
-                    result: identifier.into(),
-                    result_type,
-                    code_sequence: vec![]
-                }
-            },
-            AstNode::IntLiteral(n) => {
-                let register = Temporary::new();
-                CodeObject {
-                    result: register.into(),
-                    result_type: ResultType::Int,
-                    code_sequence: vec![ThreeAddressCode::Store {
-                        lhs: LValue::Temp(register),
-                        rhs: n.into(),
-                    }]
-                }
-            },
-            AstNode::FloatLiteral(n)  => {
-                let register = Temporary::new();
-                CodeObject {
-                    result: register.into(),
-                    result_type: ResultType::Float,
-                    code_sequence: vec![ThreeAddressCode::Store {
-                        lhs: LValue::Temp(register),
-                        rhs: n.into(),
-                    }]
-                }
-            },
-            AstNode::ReadExpr(identifiers) => {
-                let code_sequence = identifiers
-                    .into_iter()
-                    .map(|identifier| ThreeAddressCode::Read {
-                        identifier,
-                    })
-                    .collect();
-
-                CodeObject {
-                    result: Operand::None,
-                    result_type: ResultType::None,
-                    code_sequence,
-                }
-            },
-            AstNode::WriteExpr(identifiers) => {
-                let code_sequence = identifiers
-                    .into_iter()
-                    .map(|identifier| ThreeAddressCode::Write {
-                        identifier,
-                    })
-                    .collect();
-
-                CodeObject {
-                    result: Operand::None,
-                    result_type: ResultType::None,
-                    code_sequence,
-                }
-            },
+            AstNode::Id(identifier)  => self.visit_identifier(identifier),
+            AstNode::IntLiteral(n) => self.visit_int_literal(n),
+            AstNode::FloatLiteral(n)  => self.visit_float_literal(n),
+            AstNode::ReadExpr(identifiers) => self.visit_read_expression(identifiers),
+            AstNode::WriteExpr(identifiers) => self.visit_write_expr(identifiers),
             AstNode::AssignExpr {
                 lhs,
                 rhs
-            } => {
-                let rhs = Self::walk_ast(Box::into_inner(rhs));
-
-                let (curr_operand, mut code_sequence) = (rhs.result, rhs.code_sequence);
-
-                let assign_code = ThreeAddressCode::Store {
-                    lhs: LValue::Id(lhs),
-                    rhs: curr_operand
-                };
-
-                code_sequence.push(assign_code);
-
-                CodeObject {
-                    result: Operand::None,
-                    result_type: ResultType::None,
-                    code_sequence,
-                }
-            },
+            } => self.visit_assign_expr(lhs, rhs),
             AstNode::AddExpr {
                 op,
                 lhs,
                 rhs
-            } => {
-                let lhs = Self::walk_ast(Box::into_inner(lhs));
-                let rhs = Self::walk_ast(Box::into_inner(rhs));
-
-                let result_type = Self::combined_result_type(lhs.result_type, rhs.result_type);
-                let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
-                let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
-
-                let register = Temporary::new();
-
-                let curr_code = match op {
-                    AddOp::Add => ThreeAddressCode::Add {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
-                        register,
-                    },
-                    AddOp::Sub => ThreeAddressCode::Sub {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
-                        register,
-                    }
-                };
-
-                left_code_seq.append(&mut right_code_seq);
-                left_code_seq.push(curr_code);
-
-                CodeObject {
-                    result: register.into(),
-                    result_type: result_type,
-                    code_sequence: left_code_seq,
-                }
-            },
+            } => self.visit_add_expr(op, lhs, rhs),
             AstNode::MulExpr {
                 op,
                 lhs,
                 rhs
-            } => {
-                let lhs = Self::walk_ast(Box::into_inner(lhs));
-                let rhs = Self::walk_ast(Box::into_inner(rhs));
-
-                let result_type = Self::combined_result_type(lhs.result_type, rhs.result_type);
-                let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
-                let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
-
-                let register = Temporary::new();
-
-                let curr_code = match op {
-                    MulOp::Mul => ThreeAddressCode::Mul {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
-                        register,
-                    },
-                    MulOp::Div => ThreeAddressCode::Div {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
-                        register,
-                    }
-                };
-
-                left_code_seq.append(&mut right_code_seq);
-                left_code_seq.push(curr_code);
-
-                CodeObject {
-                    result: register.into(),
-                    result_type: result_type,
-                    code_sequence: left_code_seq,
-                }
-            },
+            } => self.visit_mul_expr(op, lhs, rhs),
             AstNode::None => panic!("AST contains a `None` node. Cannot convert incomplete AST into a CodeObject"),
+        }
+    }
+}
+
+// Note - Visitor pattern does not care about traversal strategy. For instance I can
+//  traverse the AST using Pre-Order traversal and the visitor pattern will still apply.
+//  In fact, if my visitor did not have to return a value from each visit_* call, I could
+//  have separated the traversal strategy into a separate method.
+// TODO: Can the Post-Order traversal of the AST be done iteratively?
+impl Visitor<CodeObject> for ThreeAddressCodeIR {
+    fn visit_identifier(&mut self, id: Identifier) -> CodeObject {
+        let result_type = id.sym_type.into();
+
+        CodeObject {
+            result: id.into(),
+            result_type,
+            code_sequence: vec![]
+        }
+    }
+
+    fn visit_int_literal(&mut self, n: i32) -> CodeObject {
+        let register = Temporary::new();
+        CodeObject {
+            result: register.into(),
+            result_type: ResultType::Int,
+            code_sequence: vec![ThreeAddressCode::Store {
+                lhs: LValue::Temp(register),
+                rhs: n.into(),
+            }]
+        }
+    }
+
+    fn visit_float_literal(&mut self, n: f64) -> CodeObject {
+        let register = Temporary::new();
+        CodeObject {
+            result: register.into(),
+            result_type: ResultType::Float,
+            code_sequence: vec![ThreeAddressCode::Store {
+                lhs: LValue::Temp(register),
+                rhs: n.into(),
+            }]
+        }
+    }
+
+    fn visit_read_expression(&mut self, identifiers: Vec<Identifier>) -> CodeObject {
+        let code_sequence = identifiers
+            .into_iter()
+            .map(|identifier| ThreeAddressCode::Read {
+                identifier,
+            })
+            .collect();
+
+        CodeObject {
+            result: Operand::None,
+            result_type: ResultType::None,
+            code_sequence,
+        }
+    }
+
+    fn visit_write_expr(&mut self, identifiers: Vec<Identifier>) -> CodeObject {
+        let code_sequence = identifiers
+            .into_iter()
+            .map(|identifier| ThreeAddressCode::Write {
+                identifier,
+            })
+            .collect();
+
+        CodeObject {
+            result: Operand::None,
+            result_type: ResultType::None,
+            code_sequence,
+        }
+    }
+
+    fn visit_add_expr(&mut self, op: AddOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> CodeObject {
+        let lhs = self.walk_ast(Box::into_inner(lhs));
+        let rhs = self.walk_ast(Box::into_inner(rhs));
+
+        let result_type = ThreeAddressCodeIR::combined_result_type(lhs.result_type, rhs.result_type);
+        let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
+        let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
+
+        let register = Temporary::new();
+
+        let curr_code = match op {
+            AddOp::Add => ThreeAddressCode::Add {
+                lhs: curr_left_operand,
+                rhs: curr_right_operand,
+                register,
+            },
+            AddOp::Sub => ThreeAddressCode::Sub {
+                lhs: curr_left_operand,
+                rhs: curr_right_operand,
+                register,
+            }
+        };
+
+        left_code_seq.append(&mut right_code_seq);
+        left_code_seq.push(curr_code);
+
+        CodeObject {
+            result: register.into(),
+            result_type: result_type,
+            code_sequence: left_code_seq,
+        }
+    }
+
+    fn visit_mul_expr(&mut self, op: MulOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> CodeObject {
+        let lhs = self.walk_ast(Box::into_inner(lhs));
+        let rhs = self.walk_ast(Box::into_inner(rhs));
+
+        let result_type = ThreeAddressCodeIR::combined_result_type(lhs.result_type, rhs.result_type);
+        let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
+        let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
+
+        let register = Temporary::new();
+
+        let curr_code = match op {
+            MulOp::Mul => ThreeAddressCode::Mul {
+                lhs: curr_left_operand,
+                rhs: curr_right_operand,
+                register,
+            },
+            MulOp::Div => ThreeAddressCode::Div {
+                lhs: curr_left_operand,
+                rhs: curr_right_operand,
+                register,
+            }
+        };
+
+        left_code_seq.append(&mut right_code_seq);
+        left_code_seq.push(curr_code);
+
+        CodeObject {
+            result: register.into(),
+            result_type: result_type,
+            code_sequence: left_code_seq,
+        }
+    }
+
+    fn visit_assign_expr(&mut self, lhs: Identifier, rhs: Box<AstNode>) -> CodeObject {
+        let rhs = self.walk_ast(Box::into_inner(rhs));
+
+        let (curr_operand, mut code_sequence) = (rhs.result, rhs.code_sequence);
+
+        let assign_code = ThreeAddressCode::Store {
+            lhs: LValue::Id(lhs),
+            rhs: curr_operand
+        };
+
+        code_sequence.push(assign_code);
+
+        CodeObject {
+            result: Operand::None,
+            result_type: ResultType::None,
+            code_sequence,
         }
     }
 }
@@ -366,7 +381,9 @@ mod test {
             })),
         };
 
-        let code_object = CodeObject::walk_ast(ast);
+        let mut visitor = ThreeAddressCodeIR;
+
+        let code_object = visitor.walk_ast(ast);
 
         dbg!(code_object.clone());
 
