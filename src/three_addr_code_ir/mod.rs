@@ -1,125 +1,145 @@
 //! Three Address Code Intermediate representation
-use crate::types::{Identifier, NumType};
 use std::sync::atomic::{AtomicU64, Ordering};
-use crate::ast::ast_node::{AstNode, AddOp, MulOp};
-use crate::symbol_table::SymbolType;
+use crate::types::{NumType, Identifier, SymbolType};
 use derive_more::Display;
-use crate::ast::ast_node::visit::Visitor;
+
+pub mod three_address_code;
+
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Debug, Copy, Clone, Display)]
-#[display(fmt = "$T{}", _0)]
-pub struct Temporary(u64);
+#[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
+#[display(fmt = "$T{}", id)]
+pub struct Temporary {
+    id: u64,
+    num_type: NumType,
+}
 
 impl Temporary {
-    pub fn new() -> Self {
-        Temporary(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
+    pub fn new(num_type: NumType) -> Self {
+        Self {
+            id: TEMP_COUNTER.fetch_add(1, Ordering::SeqCst),
+            num_type: num_type
+        }
+    }
+}
+
+#[derive(Debug, Display, Clone)]
+pub struct IdentI(String);
+
+impl From<Identifier> for IdentI {
+    fn from(id: Identifier) -> Self {
+        IdentI(id.id)
+    }
+}
+
+#[derive(Debug, Display, Clone)]
+pub struct IdentF(String);
+
+impl From<Identifier> for IdentF {
+    fn from(id: Identifier) -> Self {
+        IdentF(id.id)
+    }
+}
+
+#[derive(Debug, Display, Clone)]
+pub struct IdentS(String);
+
+impl From<Identifier> for IdentS {
+    fn from(id: Identifier) -> Self {
+        IdentS(id.id)
     }
 }
 
 #[derive(Debug, Clone, Display)]
-pub enum LValue {
+pub enum LValueI {
     Temp(Temporary),
-    #[display(fmt = "{}", "_0.id")]
-    Id(Identifier),
+    #[display(fmt = "{}", _0)]
+    Id(IdentI),
+}
+
+#[derive(Debug, Clone, Display)]
+pub enum LValueF {
+    Temp(Temporary),
+    #[display(fmt = "{}", _0)]
+    Id(IdentF),
 }
 
 #[derive(Debug, Clone, Display)]
 pub enum RValue {
     IntLiteral(i32),
     FloatLiteral(f64),
-    StringLiteral(String),
 }
 
 #[derive(Debug, Clone, Display)]
-pub enum Operand {
-    LValue(LValue),
+pub enum BinaryExprOperand {
+    LValueI(LValueI),
+    LValueF(LValueF),
     RValue(RValue),
-    None,
 }
 
-impl From<Temporary> for Operand {
-    fn from(val: Temporary) -> Self {
-        Operand::LValue(LValue::Temp(val))
+impl BinaryExprOperand {
+    fn operand_type(&self) -> ResultType {
+        match self {
+            BinaryExprOperand::LValueI(_) => ResultType::Int,
+            BinaryExprOperand::LValueF(_) => ResultType::Float,
+            BinaryExprOperand::RValue(rval) => match rval {
+                RValue::IntLiteral(_) => ResultType::Int,
+                RValue::FloatLiteral(_) => ResultType::Float,
+            }
+        }
     }
 }
 
-impl From<Identifier> for Operand {
-    fn from(val: Identifier) -> Self {
-        Operand::LValue(LValue::Id(val))
+impl From<Temporary> for BinaryExprOperand {
+    fn from(temp: Temporary) -> Self {
+        match temp.num_type {
+            NumType::Int => BinaryExprOperand::LValueI(LValueI::Temp(temp)),
+            NumType::Float => BinaryExprOperand::LValueF(LValueF::Temp(temp)),
+        }
     }
 }
 
-impl From<i32> for Operand {
+impl From<IdentI> for BinaryExprOperand {
+    fn from(val: IdentI) -> Self {
+        BinaryExprOperand::LValueI(LValueI::Id(val))
+    }
+}
+
+impl From<IdentF> for BinaryExprOperand {
+    fn from(val: IdentF) -> Self {
+        BinaryExprOperand::LValueF(LValueF::Id(val))
+    }
+}
+
+impl From<i32> for BinaryExprOperand {
     fn from(val: i32) -> Self {
-        Operand::RValue(RValue::IntLiteral(val))
+        BinaryExprOperand::RValue(RValue::IntLiteral(val))
     }
 }
 
-impl From<f64> for Operand {
+impl From<f64> for BinaryExprOperand {
     fn from(val: f64) -> Self {
-        Operand::RValue(RValue::FloatLiteral(val))
+        BinaryExprOperand::RValue(RValue::FloatLiteral(val))
     }
 }
 
-impl From<String> for Operand {
-    fn from(val: String) -> Self {
-        Operand::RValue(RValue::StringLiteral(val))
+impl From<LValueI> for BinaryExprOperand {
+    fn from(lvalue: LValueI) -> Self {
+        BinaryExprOperand::LValueI(lvalue)
     }
 }
 
-impl From<LValue> for Operand {
-    fn from(lvalue: LValue) -> Self {
-        Operand::LValue(lvalue)
+impl From<LValueF> for BinaryExprOperand {
+    fn from(lvalue: LValueF) -> Self {
+        BinaryExprOperand::LValueF(lvalue)
     }
 }
 
-impl From<RValue> for Operand {
+impl From<RValue> for BinaryExprOperand {
     fn from(rvalue: RValue) -> Self {
-        Operand::RValue(rvalue)
+        BinaryExprOperand::RValue(rvalue)
     }
-}
-
-#[derive(Debug, Clone, Display)]
-pub enum ThreeAddressCode {
-    #[display(fmt = "ADDI {} {} {}", lhs, rhs, register)]
-    Add {
-        lhs: Operand,
-        rhs: Operand,
-        register: Temporary,
-    },
-    #[display(fmt = "SUBI {} {} {}", lhs, rhs, register)]
-    Sub {
-        lhs: Operand,
-        rhs: Operand,
-        register: Temporary,
-    },
-    #[display(fmt = "MULTI {} {} {}", lhs, rhs, register)]
-    Mul {
-        lhs: Operand,
-        rhs: Operand,
-        register: Temporary,
-    },
-    #[display(fmt = "DIVI {} {} {}", lhs, rhs, register)]
-    Div {
-        lhs: Operand,
-        rhs: Operand,
-        register: Temporary,
-    },
-    #[display(fmt = "STOREI {} {}", rhs, lhs)]
-    Store {
-        lhs: LValue,
-        rhs: Operand,
-    },
-    #[display(fmt = "READI {}", "identifier.id")]
-    Read {
-        identifier: Identifier,
-    },
-    #[display(fmt = "WRITEI {}", "identifier.id")]
-    Write {
-        identifier: Identifier,
-    },
 }
 
 // TODO: Should this be moved to common types?
@@ -128,7 +148,6 @@ pub enum ResultType {
     String,
     Int,
     Float,
-    None
 }
 
 impl From<SymbolType> for ResultType {
@@ -142,253 +161,5 @@ impl From<SymbolType> for ResultType {
                 }
             },
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CodeObject {
-    pub result: Operand,
-    pub result_type: ResultType,
-    pub code_sequence: Vec<ThreeAddressCode>,
-}
-
-#[derive(Debug)]
-pub struct ThreeAddressCodeIR;
-
-impl ThreeAddressCodeIR {
-    pub fn combined_result_type(left: ResultType, right: ResultType) -> ResultType {
-        match (left, right) {
-            (ResultType::Float, ResultType::Float) => ResultType::Float,
-            (ResultType::Int, ResultType::Int) => ResultType::Int,
-            (_, _) => panic!("Unsupported result type combination. Left: [{:?}], Right: [{:?}]", left, right),
-        }
-    }
-
-    pub fn walk_ast(&mut self, ast: AstNode) -> CodeObject {
-        return match ast {
-            AstNode::Id(identifier)  => self.visit_identifier(identifier),
-            AstNode::IntLiteral(n) => self.visit_int_literal(n),
-            AstNode::FloatLiteral(n)  => self.visit_float_literal(n),
-            AstNode::ReadExpr(identifiers) => self.visit_read_expression(identifiers),
-            AstNode::WriteExpr(identifiers) => self.visit_write_expr(identifiers),
-            AstNode::AssignExpr {
-                lhs,
-                rhs
-            } => self.visit_assign_expr(lhs, rhs),
-            AstNode::AddExpr {
-                op,
-                lhs,
-                rhs
-            } => self.visit_add_expr(op, lhs, rhs),
-            AstNode::MulExpr {
-                op,
-                lhs,
-                rhs
-            } => self.visit_mul_expr(op, lhs, rhs),
-            AstNode::None => panic!("AST contains a `None` node. Cannot convert incomplete AST into a CodeObject"),
-        }
-    }
-}
-
-// Note - Visitor pattern does not care about traversal strategy. For instance I can
-//  traverse the AST using Pre-Order traversal and the visitor pattern will still apply.
-//  In fact, if my visitor did not have to return a value from each visit_* call, I could
-//  have separated the traversal strategy into a separate method.
-// TODO: Can the Post-Order traversal of the AST be done iteratively?
-impl Visitor<CodeObject> for ThreeAddressCodeIR {
-    fn visit_identifier(&mut self, id: Identifier) -> CodeObject {
-        let result_type = id.sym_type.into();
-
-        CodeObject {
-            result: id.into(),
-            result_type,
-            code_sequence: vec![]
-        }
-    }
-
-    fn visit_int_literal(&mut self, n: i32) -> CodeObject {
-        let register = Temporary::new();
-        CodeObject {
-            result: register.into(),
-            result_type: ResultType::Int,
-            code_sequence: vec![ThreeAddressCode::Store {
-                lhs: LValue::Temp(register),
-                rhs: n.into(),
-            }]
-        }
-    }
-
-    fn visit_float_literal(&mut self, n: f64) -> CodeObject {
-        let register = Temporary::new();
-        CodeObject {
-            result: register.into(),
-            result_type: ResultType::Float,
-            code_sequence: vec![ThreeAddressCode::Store {
-                lhs: LValue::Temp(register),
-                rhs: n.into(),
-            }]
-        }
-    }
-
-    fn visit_read_expression(&mut self, identifiers: Vec<Identifier>) -> CodeObject {
-        let code_sequence = identifiers
-            .into_iter()
-            .map(|identifier| ThreeAddressCode::Read {
-                identifier,
-            })
-            .collect();
-
-        CodeObject {
-            result: Operand::None,
-            result_type: ResultType::None,
-            code_sequence,
-        }
-    }
-
-    fn visit_write_expr(&mut self, identifiers: Vec<Identifier>) -> CodeObject {
-        let code_sequence = identifiers
-            .into_iter()
-            .map(|identifier| ThreeAddressCode::Write {
-                identifier,
-            })
-            .collect();
-
-        CodeObject {
-            result: Operand::None,
-            result_type: ResultType::None,
-            code_sequence,
-        }
-    }
-
-    fn visit_add_expr(&mut self, op: AddOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> CodeObject {
-        let lhs = self.walk_ast(Box::into_inner(lhs));
-        let rhs = self.walk_ast(Box::into_inner(rhs));
-
-        let result_type = ThreeAddressCodeIR::combined_result_type(lhs.result_type, rhs.result_type);
-        let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
-        let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
-
-        let register = Temporary::new();
-
-        let curr_code = match op {
-            AddOp::Add => ThreeAddressCode::Add {
-                lhs: curr_left_operand,
-                rhs: curr_right_operand,
-                register,
-            },
-            AddOp::Sub => ThreeAddressCode::Sub {
-                lhs: curr_left_operand,
-                rhs: curr_right_operand,
-                register,
-            }
-        };
-
-        left_code_seq.append(&mut right_code_seq);
-        left_code_seq.push(curr_code);
-
-        CodeObject {
-            result: register.into(),
-            result_type: result_type,
-            code_sequence: left_code_seq,
-        }
-    }
-
-    fn visit_mul_expr(&mut self, op: MulOp, lhs: Box<AstNode>, rhs: Box<AstNode>) -> CodeObject {
-        let lhs = self.walk_ast(Box::into_inner(lhs));
-        let rhs = self.walk_ast(Box::into_inner(rhs));
-
-        let result_type = ThreeAddressCodeIR::combined_result_type(lhs.result_type, rhs.result_type);
-        let (curr_left_operand, mut left_code_seq) = (lhs.result, lhs.code_sequence);
-        let (curr_right_operand, mut right_code_seq) = (rhs.result, rhs.code_sequence);
-
-        let register = Temporary::new();
-
-        let curr_code = match op {
-            MulOp::Mul => ThreeAddressCode::Mul {
-                lhs: curr_left_operand,
-                rhs: curr_right_operand,
-                register,
-            },
-            MulOp::Div => ThreeAddressCode::Div {
-                lhs: curr_left_operand,
-                rhs: curr_right_operand,
-                register,
-            }
-        };
-
-        left_code_seq.append(&mut right_code_seq);
-        left_code_seq.push(curr_code);
-
-        CodeObject {
-            result: register.into(),
-            result_type: result_type,
-            code_sequence: left_code_seq,
-        }
-    }
-
-    fn visit_assign_expr(&mut self, lhs: Identifier, rhs: Box<AstNode>) -> CodeObject {
-        let rhs = self.walk_ast(Box::into_inner(rhs));
-
-        let (curr_operand, mut code_sequence) = (rhs.result, rhs.code_sequence);
-
-        let assign_code = ThreeAddressCode::Store {
-            lhs: LValue::Id(lhs),
-            rhs: curr_operand
-        };
-
-        code_sequence.push(assign_code);
-
-        CodeObject {
-            result: Operand::None,
-            result_type: ResultType::None,
-            code_sequence,
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::ast::ast_node::{AstNode, AddOp, MulOp};
-    use crate::symbol_table::SymbolType;
-    use crate::types::NumType;
-    use super::*;
-
-    #[test]
-    fn convert_simple_expression_ast_to_code_object() {
-        // Expression => b*b + a
-        // AST -
-        //      (+)
-        //      / \
-        //    (*) (a)
-        //   /  \
-        // (b)  (b)
-        let ast = AstNode::AddExpr {
-            op: AddOp::Add,
-            lhs: Box::new(AstNode::MulExpr {
-                op: MulOp::Mul,
-                lhs: Box::new(AstNode::Id(Identifier {
-                    id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int)
-                })),
-                rhs: Box::new(AstNode::Id(Identifier {
-                    id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int)
-                })),
-            }),
-            rhs: Box::new(AstNode::Id(Identifier {
-                id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Int)
-            })),
-        };
-
-        let mut visitor = ThreeAddressCodeIR;
-
-        let code_object = visitor.walk_ast(ast);
-
-        dbg!(code_object.clone());
-
-        assert!(matches!(code_object.result, Operand::LValue(LValue::Temp(_))));
-        assert_eq!(ResultType::Int, code_object.result_type);
-        assert_eq!(2, code_object.code_sequence.len());
     }
 }

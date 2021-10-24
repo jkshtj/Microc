@@ -8,7 +8,7 @@ use std::fmt::{Debug, Display, Formatter};
 use atomic_refcell::AtomicRefCell;
 use getset::Getters;
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
-use crate::types::NumType;
+use crate::types::{NumType, SymbolType};
 
 lazy_static::lazy_static! {
     pub static ref SYMBOL_TABLE: AtomicRefCell<SymbolTable> = AtomicRefCell::new(SymbolTable::new());
@@ -58,6 +58,20 @@ impl SymbolTable {
             active_scope_stack: vec![0],
             anonymous_scope_counter: 0,
             decl_error: None,
+        }
+    }
+
+    /// Empties the symbol table and returns the current symbols.
+    /// Should only be called after AST construction.
+    pub fn into_symbols() -> Vec<Symbol> {
+        if let Ok(mut symbol_table) = SYMBOL_TABLE.try_borrow_mut() {
+            let scopes = std::mem::take(&mut symbol_table.scope_tree);
+            scopes
+                .into_iter()
+                .flat_map(|scope| scope.symbols)
+                .collect()
+        } else {
+            todo!("Log a message/error!")
         }
     }
 
@@ -294,12 +308,6 @@ impl Symbol {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum SymbolType {
-    String,
-    Num(NumType),
-}
-
 #[cfg(test)]
 mod test {
     use crate::token::{Token, TokenType};
@@ -307,6 +315,7 @@ mod test {
     // modify the same symbol table.
     use serial_test::serial;
     use super::*;
+    use crate::types::SymbolType;
 
     fn setup() {
         let mut symbol_table = SYMBOL_TABLE.borrow_mut();
@@ -416,4 +425,5 @@ mod test {
     }
 
     // TODO: Add test for testing symbol conflict in scope
+    // TODO: Add test for converting symbol table into list of symbols
 }

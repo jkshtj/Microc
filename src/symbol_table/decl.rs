@@ -18,6 +18,10 @@ impl StringDecl {
     pub fn get_name(&self) -> &str {
         self.name.as_str()
     }
+
+    pub fn into_parts(self) -> (String, String) {
+        (self.name, self.value)
+    }
 }
 
 #[derive(Debug, Display, PartialEq, Clone)]
@@ -36,6 +40,10 @@ impl IntDecl {
     pub fn get_name(&self) -> &str {
         self.name.as_str()
     }
+
+    pub fn into_name(self) -> String {
+        self.name
+    }
 }
 
 #[derive(Debug, Display, PartialEq, Clone)]
@@ -53,6 +61,10 @@ impl FloatDecl {
 
     pub fn get_name(&self) -> &str {
         self.name.as_str()
+    }
+
+    pub fn into_name(self) -> String {
+        self.name
     }
 }
 
