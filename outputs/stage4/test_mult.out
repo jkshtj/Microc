@@ -9,7 +9,9 @@
 ;READI d
 ;MULTI a c $T3
 ;MULTI b d $T4
+
 ;ADDI $T3 $T4 $T5
+
 ;STOREI $T5 e
 ;WRITEI c
 ;WRITES newline
@@ -35,6 +37,7 @@ move a r2
 muli c r2
 move b r3
 muli d r3
+
 move r2 r4
 addi r3 r4
 move r4 e

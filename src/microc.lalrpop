@@ -1,4 +1,4 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Expr, Stmt};
 use crate::symbol_table::SymbolTable;
 use crate::types::{NumType, Identifier};
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
@@ -230,10 +230,10 @@ assign_expr: AstNode = {
 
         let rhs = Box::new(expr);
 
-        AstNode::AssignExpr {
+        AstNode::Stmt(Stmt::Assign {
             lhs,
             rhs,
-        }
+        })
     },
 };
 
@@ -249,7 +249,7 @@ read_stmt: AstNode = {
         })
         .collect();
 
-        AstNode::ReadExpr(id_list)
+        AstNode::Stmt(Stmt::Read(id_list))
     },
 };
 
@@ -265,17 +265,17 @@ write_stmt: AstNode = {
         })
         .collect();
 
-        AstNode::WriteExpr(id_list)
+        AstNode::Stmt(Stmt::Write(id_list))
     },
 };
 
 return_stmt: AstNode = {
-    RETURN <expr> ";",
+    RETURN <expr> ";" => todo!(), // TODO: Fixme!
 };
 
-expr: AstNode = {
+expr: Expr = {
     <mut expr_prefix: expr_prefix> <factor: factor> => {
-        if let AstNode::AddExpr {
+        if let Expr::AddExpr {
             op: _,
             lhs: _,
             ref mut rhs,
@@ -288,11 +288,11 @@ expr: AstNode = {
     },
 };
 
-expr_prefix: AstNode = {
+expr_prefix: Expr = {
     <mut expr_prefix: expr_prefix> <factor: factor> <mut addop: addop> => {
         match expr_prefix {
-            AstNode::None => {
-                if let AstNode::AddExpr {
+            Expr::None => {
+                if let Expr::AddExpr {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -301,7 +301,7 @@ expr_prefix: AstNode = {
                 }
             },
             _ => {
-                if let AstNode::AddExpr {
+                if let Expr::AddExpr {
                     op: _,
                     lhs: _,
                     ref mut rhs,
@@ -309,7 +309,7 @@ expr_prefix: AstNode = {
                     *rhs = Box::new(factor);
                 }
 
-                if let AstNode::AddExpr {
+                if let Expr::AddExpr {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -321,12 +321,12 @@ expr_prefix: AstNode = {
 
         addop
     },
-    empty => AstNode::None,
+    empty => Expr::None,
 };
 
-factor: AstNode = {
+factor: Expr = {
     <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> => {
-        if let AstNode::MulExpr {
+        if let Expr::MulExpr {
             op: _,
             lhs: _,
             ref mut rhs,
@@ -339,11 +339,11 @@ factor: AstNode = {
     },
 };
 
-factor_prefix: AstNode = {
+factor_prefix: Expr = {
     <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> <mut mulop: mulop> => {
         match factor_prefix {
-            AstNode::None => {
-                if let AstNode::MulExpr {
+            Expr::None => {
+                if let Expr::MulExpr {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -352,7 +352,7 @@ factor_prefix: AstNode = {
                 }
             },
             _ => {
-                if let AstNode::MulExpr {
+                if let Expr::MulExpr {
                     op: _,
                     lhs: _,
                     ref mut rhs,
@@ -360,7 +360,7 @@ factor_prefix: AstNode = {
                     *rhs = Box::new(postfix_expr);
                 }
 
-                if let AstNode::MulExpr {
+                if let Expr::MulExpr {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -372,16 +372,16 @@ factor_prefix: AstNode = {
 
         mulop
     },
-    empty => AstNode::None,
+    empty => Expr::None,
 };
 
-postfix_expr: AstNode = {
+postfix_expr: Expr = {
     primary,
     call_expr,
 };
 
-call_expr: AstNode = {
-    IDENTIFIER "(" expr_list ")" => AstNode::IntLiteral(42), // TODO: Fixme!
+call_expr: Expr = {
+    IDENTIFIER "(" expr_list ")" => Expr::IntLiteral(42), // TODO: Fixme!
 };
 
 expr_list: () = {
@@ -394,56 +394,56 @@ expr_list_tail: () = {
     empty,
 };
 
-primary: AstNode = {
+primary: Expr = {
     "(" <expr> ")",
     <IDENTIFIER> => {
         // TODO: Handle failure case when symbol does not exist
         let sym_type = SymbolTable::symbol_type_for(<>).unwrap();
-        AstNode::Id(Identifier {
+        Expr::Id(Identifier {
             id: <>.to_string(),
             sym_type
         })
     },
     <INTLITERAL> => {
         // TODO: Handle parsing failures
-        AstNode::IntLiteral(i32::from_str(<>).unwrap())
+        Expr::IntLiteral(i32::from_str(<>).unwrap())
     },
     <FLOATLITERAL> => {
         // TODO: Handle parsing failures
-        AstNode::FloatLiteral(f64::from_str(<>).unwrap())
+        Expr::FloatLiteral(f64::from_str(<>).unwrap())
     },
 };
 
-addop: AstNode = {
+addop: Expr = {
     "+" => {
-        AstNode::AddExpr {
+        Expr::AddExpr {
             op: AddOp::Add,
-            lhs: Box::new(AstNode::None),
-            rhs: Box::new(AstNode::None),
+            lhs: Box::new(Expr::None),
+            rhs: Box::new(Expr::None),
         }
     },
     "-" => {
-       AstNode::AddExpr {
+       Expr::AddExpr {
            op: AddOp::Sub,
-           lhs: Box::new(AstNode::None),
-           rhs: Box::new(AstNode::None),
+           lhs: Box::new(Expr::None),
+           rhs: Box::new(Expr::None),
        }
    },
 };
 
-mulop: AstNode = {
+mulop: Expr = {
     "*" => {
-       AstNode::MulExpr {
+       Expr::MulExpr {
            op: MulOp::Mul,
-           lhs: Box::new(AstNode::None),
-           rhs: Box::new(AstNode::None),
+           lhs: Box::new(Expr::None),
+           rhs: Box::new(Expr::None),
        }
    },
     "/" => {
-      AstNode::MulExpr {
+      Expr::MulExpr {
           op: MulOp::Div,
-          lhs: Box::new(AstNode::None),
-          rhs: Box::new(AstNode::None),
+          lhs: Box::new(Expr::None),
+          rhs: Box::new(Expr::None),
       }
    },
 };

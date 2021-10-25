@@ -37,13 +37,13 @@ pub enum Expr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
+    None,
 }
 
 #[derive(Debug)]
 pub enum AstNode {
     Stmt(Stmt),
     Expr(Expr),
-    None,
 }
 
 pub mod visit {

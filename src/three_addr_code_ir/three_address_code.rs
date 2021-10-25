@@ -114,7 +114,6 @@ pub mod visit {
             return match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
                 AstNode::Expr(expr) => self.visit_expression(expr),
-                AstNode::None => panic!("AST contains a `None` node. Cannot convert incomplete AST into a CodeObject"),
             }
         }
     }
@@ -383,6 +382,7 @@ pub mod visit {
                         code_sequence: left_code_seq,
                     }
                 }
+                Expr::None => panic!("Invalid AST: AST expression node contains expression variant `None`.")
             }
         }
     }

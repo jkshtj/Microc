@@ -1,4 +1,5 @@
-//! Three Address Code Intermediate representation
+//! Three Address Code Intermediate representation.
+//! Type checking should happen at this stage.
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::types::{NumType, Identifier, SymbolType};
 use derive_more::Display;
@@ -25,7 +26,7 @@ impl Temporary {
 }
 
 #[derive(Debug, Display, Clone)]
-pub struct IdentI(String);
+pub struct IdentI(pub String);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
@@ -34,7 +35,7 @@ impl From<Identifier> for IdentI {
 }
 
 #[derive(Debug, Display, Clone)]
-pub struct IdentF(String);
+pub struct IdentF(pub String);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
@@ -43,7 +44,7 @@ impl From<Identifier> for IdentF {
 }
 
 #[derive(Debug, Display, Clone)]
-pub struct IdentS(String);
+pub struct IdentS(pub String);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
@@ -76,19 +77,6 @@ pub enum BinaryExprOperand {
     LValueI(LValueI),
     LValueF(LValueF),
     RValue(RValue),
-}
-
-impl BinaryExprOperand {
-    fn operand_type(&self) -> ResultType {
-        match self {
-            BinaryExprOperand::LValueI(_) => ResultType::Int,
-            BinaryExprOperand::LValueF(_) => ResultType::Float,
-            BinaryExprOperand::RValue(rval) => match rval {
-                RValue::IntLiteral(_) => ResultType::Int,
-                RValue::FloatLiteral(_) => ResultType::Float,
-            }
-        }
-    }
 }
 
 impl From<Temporary> for BinaryExprOperand {
