@@ -1,12 +1,13 @@
 //! Tiny Assembly - https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
-use crate::types::{Identifier, SymbolType, NumType};
-use crate::three_addr_code_ir::{Temporary, BinaryExprOperand, LValueI, LValueF, RValue};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use atomic_refcell::AtomicRefCell;
-use crate::symbol_table::{SymbolTable, Symbol};
-use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use derive_more::Display;
+
+use crate::symbol_table::{Symbol, SymbolTable};
+use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, Temporary};
+use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 
 static REGISTER_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -122,17 +123,27 @@ pub enum TinyCode {
     Push(Option<OpmrL>),
     #[display(fmt = "POP - FIXME")]
     Pop(Option<Opmr>),
+    #[display(fmt = "JSR - FIXME")]
     Jsr(Target),
+    #[display(fmt = "RET - FIXME")]
     Ret,
     #[display(fmt = "LINK - FIXME")]
     Link(Option<u32>),
+    #[display(fmt = "UNLINK - FIXME")]
     Unlink,
+    #[display(fmt = "JMP - FIXME")]
     Jmp(Target),
+    #[display(fmt = "JGT - FIXME")]
     Jgt(Target),
+    #[display(fmt = "JLT - FIXME")]
     Jlt(Target),
+    #[display(fmt = "JGE - FIXME")]
     Jge(Target),
+    #[display(fmt = "JLE - FIXME")]
     Jle(Target),
+    #[display(fmt = "JEQ - FIXME")]
     Jeq(Target),
+    #[display(fmt = "JNE - FIXME")]
     Jne(Target),
     #[display(fmt = "sys readi {}", _0)]
     ReadI(Opmr),
@@ -144,6 +155,7 @@ pub enum TinyCode {
     WriteF(Opmr),
     #[display(fmt = "sys writes {}", _0)]
     WriteS(String),
+    #[display(fmt = "sys halt")]
     Halt,
 }
 
@@ -471,7 +483,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
 impl From<Vec<ThreeAddressCode>> for TinyCodeSequence {
     fn from(three_adr_code_seq: Vec<ThreeAddressCode>) -> Self {
         // Add all symbol declarations to tiny code sequence
-        let symbol_decls = SymbolTable::into_symbols()
+        let symbol_decls = SymbolTable::seal()
             .into_iter()
             .map(|symbol| {
                 match symbol {

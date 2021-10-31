@@ -1,14 +1,20 @@
 //! Three Address Code Intermediate representation.
 //! Type checking should happen at this stage.
 use std::sync::atomic::{AtomicU64, Ordering};
-use crate::types::{NumType, Identifier, SymbolType};
+
 use derive_more::Display;
+
+use crate::symbol_table::{NumType, SymbolType};
+use crate::ast::ast_node::Identifier;
 
 pub mod three_address_code;
 
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+/// 3AC concept to represent registers.
+/// There is no limit to the number
+/// of temporaries that can be created.
 #[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", id)]
 pub struct Temporary {
@@ -25,6 +31,7 @@ impl Temporary {
     }
 }
 
+/// Int identifier
 #[derive(Debug, Display, Clone)]
 pub struct IdentI(pub String);
 
@@ -34,6 +41,7 @@ impl From<Identifier> for IdentI {
     }
 }
 
+/// Float identifier
 #[derive(Debug, Display, Clone)]
 pub struct IdentF(pub String);
 
@@ -43,6 +51,7 @@ impl From<Identifier> for IdentF {
     }
 }
 
+/// String identifier
 #[derive(Debug, Display, Clone)]
 pub struct IdentS(pub String);
 
@@ -52,6 +61,9 @@ impl From<Identifier> for IdentS {
     }
 }
 
+/// Represents an int type LValue
+/// that can either be a temporary
+/// or an int identifier.
 #[derive(Debug, Clone, Display)]
 pub enum LValueI {
     Temp(Temporary),
@@ -59,6 +71,9 @@ pub enum LValueI {
     Id(IdentI),
 }
 
+/// Represents an float type LValue
+/// that can either be a temporary
+/// or an float identifier.
 #[derive(Debug, Clone, Display)]
 pub enum LValueF {
     Temp(Temporary),
@@ -66,11 +81,15 @@ pub enum LValueF {
     Id(IdentF),
 }
 
+/// Represents a RValue that can
+/// either be an int or a float
+/// literal.
 #[derive(Debug, Clone, Display)]
 pub enum RValue {
     IntLiteral(i32),
     FloatLiteral(f64),
 }
+
 
 #[derive(Debug, Clone, Display)]
 pub enum BinaryExprOperand {
@@ -130,7 +149,8 @@ impl From<RValue> for BinaryExprOperand {
     }
 }
 
-// TODO: Should this be moved to common types?
+// TODO: Move this to common types if there is a
+// use case outside of 3AC.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ResultType {
     String,

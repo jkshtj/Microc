@@ -1,8 +1,8 @@
 #![feature(box_into_inner)]
+#![allow(unused_imports)]
 mod symbol_table;
 mod ast;
 mod token;
-mod types;
 mod three_addr_code_ir;
 mod asm;
 

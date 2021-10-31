@@ -1,5 +1,6 @@
-use crate::three_addr_code_ir::{BinaryExprOperand, Temporary, LValueI, IdentI, LValueF, IdentF, IdentS};
 use derive_more::Display;
+
+use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Temporary};
 
 #[derive(Debug, Clone, Display)]
 pub enum ThreeAddressCode {
@@ -85,11 +86,11 @@ pub enum ThreeAddressCode {
 
 
 pub mod visit {
-    use crate::three_addr_code_ir::{BinaryExprOperand, ResultType, LValueI, IdentI, LValueF, IdentF, Temporary};
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt};
     use crate::ast::ast_node::visit::Visitor;
-    use crate::ast::ast_node::{Stmt, Expr, AddOp, MulOp, AstNode};
-    use crate::types::{SymbolType, NumType};
+    use crate::symbol_table::{NumType, SymbolType};
+    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, Temporary};
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 
     #[derive(Debug, Clone)]
     pub struct CodeObject {
@@ -391,11 +392,12 @@ pub mod visit {
 
 #[cfg(test)]
 mod test {
-    use crate::ast::ast_node::{AstNode, AddOp, MulOp, Expr};
-    use crate::types::{NumType, SymbolType, Identifier};
-    use super::*;
-    use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
+    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Identifier};
+    use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::ResultType;
+    use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
+
+    use super::*;
 
     #[test]
     fn convert_simple_int_expression_ast_to_code_object() {

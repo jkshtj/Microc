@@ -1,6 +1,5 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp, Expr, Stmt};
-use crate::symbol_table::SymbolTable;
-use crate::types::{NumType, Identifier};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Expr, Stmt, Identifier};
+use crate::symbol_table::{SymbolTable, NumType};
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
 use std::str::FromStr;

@@ -42,6 +42,9 @@ pub enum SymbolTable {
 }
 
 impl SymbolTable {
+    // TODO: Do we need a symbol table iterator that
+    // allows us to iterate through symbols without
+    // consuming the symbol table?
     /// Seals the symbol table and
     /// returns the current symbols.
     pub fn seal() -> Vec<Symbol> {
