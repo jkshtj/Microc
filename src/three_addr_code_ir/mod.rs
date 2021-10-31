@@ -12,22 +12,29 @@ pub mod three_address_code;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-/// 3AC concept to represent registers.
+/// 3AC concept to represent int registers.
 /// There is no limit to the number
-/// of temporaries that can be created.
+/// of int temporaries that can be created.
 #[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
-#[display(fmt = "$T{}", id)]
-pub struct Temporary {
-    id: u64,
-    num_type: NumType,
+#[display(fmt = "$T{}", _0)]
+pub struct TempI(u64);
+
+impl TempI {
+    pub fn new() -> Self {
+        Self(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
+    }
 }
 
-impl Temporary {
-    pub fn new(num_type: NumType) -> Self {
-        Self {
-            id: TEMP_COUNTER.fetch_add(1, Ordering::SeqCst),
-            num_type: num_type
-        }
+/// 3AC concept to represent float registers.
+/// There is no limit to the number
+/// of int temporaries that can be created.
+#[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
+#[display(fmt = "$T{}", _0)]
+pub struct TempF(u64);
+
+impl TempF {
+    pub fn new() -> Self {
+        Self(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
     }
 }
 
@@ -66,7 +73,7 @@ impl From<Identifier> for IdentS {
 /// or an int identifier.
 #[derive(Debug, Clone, Display)]
 pub enum LValueI {
-    Temp(Temporary),
+    Temp(TempI),
     #[display(fmt = "{}", _0)]
     Id(IdentI),
 }
@@ -76,7 +83,7 @@ pub enum LValueI {
 /// or an float identifier.
 #[derive(Debug, Clone, Display)]
 pub enum LValueF {
-    Temp(Temporary),
+    Temp(TempF),
     #[display(fmt = "{}", _0)]
     Id(IdentF),
 }
@@ -98,12 +105,15 @@ pub enum BinaryExprOperand {
     RValue(RValue),
 }
 
-impl From<Temporary> for BinaryExprOperand {
-    fn from(temp: Temporary) -> Self {
-        match temp.num_type {
-            NumType::Int => BinaryExprOperand::LValueI(LValueI::Temp(temp)),
-            NumType::Float => BinaryExprOperand::LValueF(LValueF::Temp(temp)),
-        }
+impl From<TempI> for BinaryExprOperand {
+    fn from(temp: TempI) -> Self {
+        BinaryExprOperand::LValueI(LValueI::Temp(temp))
+    }
+}
+
+impl From<TempF> for BinaryExprOperand {
+    fn from(temp: TempF) -> Self {
+        BinaryExprOperand::LValueF(LValueF::Temp(temp))
     }
 }
 
@@ -150,7 +160,7 @@ impl From<RValue> for BinaryExprOperand {
 }
 
 // TODO: Move this to common types if there is a
-// use case outside of 3AC.
+//  use case outside of 3AC.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ResultType {
     String,

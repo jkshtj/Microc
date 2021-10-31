@@ -1,32 +1,32 @@
 use derive_more::Display;
 
-use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Temporary};
+use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, TempI, TempF};
 
 #[derive(Debug, Clone, Display)]
 pub enum ThreeAddressCode {
-    #[display(fmt = "ADDI {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "ADDI {} {} {}", lhs, rhs, temp_result)]
     AddI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempI,
     },
-    #[display(fmt = "SUBI {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "SUBI {} {} {}", lhs, rhs, temp_result)]
     SubI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempI,
     },
-    #[display(fmt = "MULTI {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "MULTI {} {} {}", lhs, rhs, temp_result)]
     MulI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempI,
     },
-    #[display(fmt = "DIVI {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "DIVI {} {} {}", lhs, rhs, temp_result)]
     DivI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempI,
     },
     #[display(fmt = "STOREI {} {}", rhs, lhs)]
     StoreI {
@@ -41,29 +41,29 @@ pub enum ThreeAddressCode {
     WriteI {
         identifier: IdentI,
     },
-    #[display(fmt = "ADDF {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "ADDF {} {} {}", lhs, rhs, temp_result)]
     AddF {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempF,
     },
-    #[display(fmt = "SUBF {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "SUBF {} {} {}", lhs, rhs, temp_result)]
     SubF {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempF,
     },
-    #[display(fmt = "MULTF {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "MULTF {} {} {}", lhs, rhs, temp_result)]
     MulF {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempF,
     },
-    #[display(fmt = "DIVF {} {} {}", lhs, rhs, register)]
+    #[display(fmt = "DIVF {} {} {}", lhs, rhs, temp_result)]
     DivF {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
-        register: Temporary,
+        temp_result: TempF,
     },
     #[display(fmt = "STOREF {} {}", rhs, lhs)]
     StoreF {
@@ -89,11 +89,13 @@ pub mod visit {
     use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt};
     use crate::ast::ast_node::visit::Visitor;
     use crate::symbol_table::{NumType, SymbolType};
-    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, Temporary};
+    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, TempI, TempF};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 
     #[derive(Debug, Clone)]
     pub struct CodeObject {
+        // TODO: this field is not modelled correctly.
+        //  `result` can only be a temporary.
         pub result: Option<BinaryExprOperand>,
         pub result_type: Option<ResultType>,
         pub code_sequence: Vec<ThreeAddressCode>,
@@ -132,7 +134,7 @@ pub mod visit {
                         .into_iter()
                         .map(|identifier| {
                             match identifier.sym_type {
-                                SymbolType::String => panic!("Unsupported operation: READ into string identifier!"),
+                                SymbolType::String => panic!("Unsupported operation: cannot READ into string identifier!"),
                                 SymbolType::Num(num_type) => {
                                     match num_type {
                                         NumType::Int => ThreeAddressCode::ReadI {
@@ -197,7 +199,7 @@ pub mod visit {
                     );
 
                     let assign_code = match lhs.sym_type {
-                        SymbolType::String => panic!("Unsupported operation: ASSIGN to a string identifier!"),
+                        SymbolType::String => panic!("Unsupported operation: Cannot ASSIGN to a string identifier!"),
                         SymbolType::Num(num_type) => {
                             match num_type {
                                 NumType::Int => ThreeAddressCode::StoreI {
@@ -241,23 +243,23 @@ pub mod visit {
                     }
                 }
                 Expr::IntLiteral(n) => {
-                    let register = Temporary::new(NumType::Int);
+                    let temp_result = TempI::new();
                     CodeObject {
-                        result: Some(register.into()),
+                        result: Some(temp_result.into()),
                         result_type: Some(ResultType::Int),
                         code_sequence: vec![ThreeAddressCode::StoreI {
-                            lhs: LValueI::Temp(register),
+                            lhs: LValueI::Temp(temp_result),
                             rhs: n.into(),
                         }]
                     }
                 }
                 Expr::FloatLiteral(n) => {
-                    let register = Temporary::new(NumType::Float);
+                    let temp_result = TempF::new();
                     CodeObject {
-                        result: Some(register.into()),
+                        result: Some(temp_result.into()),
                         result_type: Some(ResultType::Float),
                         code_sequence: vec![ThreeAddressCode::StoreF {
-                            lhs: LValueF::Temp(register),
+                            lhs: LValueF::Temp(temp_result),
                             rhs: n.into(),
                         }]
                     }
@@ -280,37 +282,55 @@ pub mod visit {
                     let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
                     let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
 
-                    let register = match result_type {
-                        ResultType::String => unreachable!(),
-                        ResultType::Int => Temporary::new(NumType::Int),
-                        ResultType::Float => Temporary::new(NumType::Float),
-                    };
-
-                    let curr_code = match op {
+                    let (curr_code, result_register) = match op {
                         AddOp::Add => match result_type {
                             ResultType::String => unreachable!(),
-                            ResultType::Int => ThreeAddressCode::AddI {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::AddI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
-                            ResultType::Float => ThreeAddressCode::AddF {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::AddF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
                         },
                         AddOp::Sub => match result_type {
                             ResultType::String => unreachable!(),
-                            ResultType::Int => ThreeAddressCode::SubI {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::SubI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
-                            ResultType::Float => ThreeAddressCode::SubF {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::SubF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
                         },
                     };
@@ -319,7 +339,7 @@ pub mod visit {
                     left_code_seq.push(curr_code);
 
                     CodeObject {
-                        result: Some(register.into()),
+                        result: Some(result_register),
                         result_type: Some(result_type),
                         code_sequence: left_code_seq,
                     }
@@ -339,37 +359,55 @@ pub mod visit {
                     let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
                     let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
 
-                    let register = match result_type {
-                        ResultType::String => unreachable!(),
-                        ResultType::Int => Temporary::new(NumType::Int),
-                        ResultType::Float => Temporary::new(NumType::Float),
-                    };
-
-                    let curr_code = match op {
+                    let (curr_code, result_register) = match op {
                         MulOp::Mul => match result_type {
                             ResultType::String => unreachable!(),
-                            ResultType::Int => ThreeAddressCode::MulI {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::MulI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
-                            ResultType::Float => ThreeAddressCode::MulF {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::MulF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
                         },
                         MulOp::Div => match result_type {
                             ResultType::String => unreachable!(),
-                            ResultType::Int => ThreeAddressCode::DivI {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::DivI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             },
-                            ResultType::Float => ThreeAddressCode::DivF {
-                                lhs: curr_left_operand,
-                                rhs: curr_right_operand,
-                                register,
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::DivF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into()
+                                )
                             }
                         },
                     };
@@ -378,7 +416,7 @@ pub mod visit {
                     left_code_seq.push(curr_code);
 
                     CodeObject {
-                        result: Some(register.into()),
+                        result: Some(result_register),
                         result_type: Some(result_type),
                         code_sequence: left_code_seq,
                     }
