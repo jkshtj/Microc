@@ -87,6 +87,7 @@ pub struct Sid {
     value: String,
 }
 
+#[allow(unused)]
 #[derive(Debug, Display)]
 pub enum TinyCode {
     #[display(fmt = "var {}", _0)]
