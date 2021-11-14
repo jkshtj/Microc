@@ -452,7 +452,10 @@ mulop: Expr = {
 
 if_stmt: Stmt = {
     // TODO: What should `decl` return?
-    start_if "(" <condition: cond> ")" decl <then_block: stmt_list> <else_block: else_part> end_if_or_else => {
+    start_if "(" <condition: cond> ")" decl <mut then_block: stmt_list> <mut else_block: else_part> end_if_or_else => {
+        then_block.reverse();
+        else_block.reverse();
+
         Stmt::If {
             condition,
             then_block,

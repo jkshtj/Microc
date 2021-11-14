@@ -120,5 +120,7 @@ pub mod visit {
     pub trait Visitor<T> {
         fn visit_statement(&mut self, stmt: Stmt) -> T;
         fn visit_expression(&mut self, expr: Expr) -> T;
+        fn visit_assignment(&mut self, assigment: Assignment) -> T;
+        fn visit_condition(&mut self, condition: Condition) -> T;
     }
 }

@@ -11,6 +11,19 @@ pub mod three_address_code;
 
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
+static LABEL_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Represents a point in the 3AC representation
+/// required to support control flow.
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, Hash)]
+#[display(fmt = "label{}", _0)]
+pub struct Label(u64);
+
+impl Label {
+    pub fn new() -> Self {
+        Self(LABEL_COUNTER.fetch_add(1, Ordering::SeqCst))
+    }
+}
 
 /// 3AC concept to represent int registers.
 /// There is no limit to the number

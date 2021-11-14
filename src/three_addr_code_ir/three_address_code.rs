@@ -1,6 +1,6 @@
 use derive_more::Display;
 
-use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, TempI, TempF};
+use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, TempI, TempF, Label};
 
 #[derive(Debug, Clone, Display)]
 pub enum ThreeAddressCode {
@@ -82,22 +82,65 @@ pub enum ThreeAddressCode {
     WriteS {
         identifier: IdentS,
     },
+    #[display(fmt = "LABEL {}", _0)]
+    Label(Label),
+    #[display(fmt = "JUMP {}", _0)]
+    Jump(Label),
+    #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
+    GT {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
+    LT {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
+    GTE {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
+    LTE {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
+    NE {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
+    EQ {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
 }
 
 
 pub mod visit {
-    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt, Assignment};
+    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt, Assignment, Condition, CmpOp};
     use crate::ast::ast_node::visit::Visitor;
     use crate::symbol_table::{NumType, SymbolType};
-    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, TempI, TempF};
+    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, TempI, TempF, Label};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{GT, LT, EQ, NE, LTE, GTE, Jump};
+    use typed_builder::TypedBuilder;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, TypedBuilder)]
+    #[builder(field_defaults(default, setter(strip_option)))]
     pub struct CodeObject {
-        // TODO: this field is not modelled correctly.
-        //  `result` can only be a temporary.
         pub result: Option<BinaryExprOperand>,
         pub result_type: Option<ResultType>,
+        pub jump_to: Option<Label>,
+        #[builder(setter(!strip_option))]
         pub code_sequence: Vec<ThreeAddressCode>,
     }
 
@@ -149,11 +192,9 @@ pub mod visit {
                         })
                         .collect();
 
-                    CodeObject {
-                        result: None,
-                        result_type: None,
-                        code_sequence,
-                    }
+                    CodeObject::builder()
+                        .code_sequence(code_sequence)
+                        .build()
                 }
                 Stmt::Write(identifiers) => {
                     let code_sequence = identifiers
@@ -177,56 +218,51 @@ pub mod visit {
                         })
                         .collect();
 
-                    CodeObject {
-                        result: None,
-                        result_type: None,
-                        code_sequence,
-                    }
+                    CodeObject::builder()
+                        .code_sequence(code_sequence)
+                        .build()
                 }
-                Stmt::Assign(Assignment {
-                    lhs,
-                    rhs
-                }) => {
-                    let rhs = self.visit_expression(rhs);
-
-                    let (curr_operand, mut code_sequence) = (
-                        // The result of a `CodeObject` returned
-                        // by an expression should never be `None`.
-                        // An expression should always evaluate to
-                        // a result with a strong type.
-                        rhs.result.unwrap(),
-                        rhs.code_sequence
-                    );
-
-                    let assign_code = match lhs.sym_type {
-                        SymbolType::String => panic!("Unsupported operation: Cannot ASSIGN to a string identifier!"),
-                        SymbolType::Num(num_type) => {
-                            match num_type {
-                                NumType::Int => ThreeAddressCode::StoreI {
-                                    lhs: LValueI::Id(IdentI(lhs.id)),
-                                    rhs: curr_operand,
-                                },
-                                NumType::Float => ThreeAddressCode::StoreF {
-                                    lhs: LValueF::Id(IdentF(lhs.id)),
-                                    rhs: curr_operand,
-                                },
-                            }
-                        }
-                    };
-
-                    code_sequence.push(assign_code);
-
-                    CodeObject {
-                        result: None,
-                        result_type: None,
-                        code_sequence,
-                    }
-                }
+                Stmt::Assign(assignment) => self.visit_assignment(assignment),
                 Stmt::If {
                     condition,
                     then_block,
                     else_block,
-                } => todo!(),
+                } => {
+                    let condition = self.visit_condition(condition);
+                    // Unwrapping is safe here as the `jump_to` field
+                    // of the returned `CodeObject`, from visiting a `Condition`
+                    // is guaranteed to be set.
+                    let else_label = condition.jump_to.unwrap();
+                    let break_label = Label::new();
+                    let mut code_sequence = condition.code_sequence;
+
+                    // `then` block statements
+                    then_block
+                        .into_iter()
+                        .for_each(|stmt| {
+                            code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                        });
+
+                    // Jump to break_label
+                    code_sequence.push(Jump(break_label));
+
+                    // `else` block label
+                    code_sequence.push(ThreeAddressCode::Label(else_label));
+
+                    // `else` block statements
+                    else_block
+                        .into_iter()
+                        .for_each(|stmt| {
+                            code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                        });
+
+                    // if-else block break-out label
+                    code_sequence.push(ThreeAddressCode::Label(break_label));
+
+                    CodeObject::builder()
+                        .code_sequence(code_sequence)
+                        .build()
+                },
                 Stmt::For {
                     init,
                     condition,
@@ -247,33 +283,34 @@ pub mod visit {
                         ResultType::Float => IdentF(identifier.id).into(),
                     };
 
-                    CodeObject {
-                        result: Some(result),
-                        result_type: Some(result_type),
-                        code_sequence: vec![]
-                    }
+                    CodeObject::builder()
+                        .result(result)
+                        .result_type(result_type)
+                        .build()
                 }
                 Expr::IntLiteral(n) => {
                     let temp_result = TempI::new();
-                    CodeObject {
-                        result: Some(temp_result.into()),
-                        result_type: Some(ResultType::Int),
-                        code_sequence: vec![ThreeAddressCode::StoreI {
+
+                    CodeObject::builder()
+                        .result(temp_result.into())
+                        .result_type(ResultType::Int)
+                        .code_sequence(vec![ThreeAddressCode::StoreI {
                             lhs: LValueI::Temp(temp_result),
                             rhs: n.into(),
-                        }]
-                    }
+                        }])
+                        .build()
                 }
                 Expr::FloatLiteral(n) => {
                     let temp_result = TempF::new();
-                    CodeObject {
-                        result: Some(temp_result.into()),
-                        result_type: Some(ResultType::Float),
-                        code_sequence: vec![ThreeAddressCode::StoreF {
+
+                    CodeObject::builder()
+                        .result(temp_result.into())
+                        .result_type(ResultType::Float)
+                        .code_sequence(vec![ThreeAddressCode::StoreF {
                             lhs: LValueF::Temp(temp_result),
                             rhs: n.into(),
-                        }]
-                    }
+                        }])
+                        .build()
                 }
                 Expr::AddExpr {
                     op,
@@ -349,11 +386,11 @@ pub mod visit {
                     left_code_seq.append(&mut right_code_seq);
                     left_code_seq.push(curr_code);
 
-                    CodeObject {
-                        result: Some(result_register),
-                        result_type: Some(result_type),
-                        code_sequence: left_code_seq,
-                    }
+                    CodeObject::builder()
+                        .result(result_register)
+                        .result_type(result_type)
+                        .code_sequence(left_code_seq)
+                        .build()
                 }
                 Expr::MulExpr {
                     op,
@@ -426,14 +463,110 @@ pub mod visit {
                     left_code_seq.append(&mut right_code_seq);
                     left_code_seq.push(curr_code);
 
-                    CodeObject {
-                        result: Some(result_register),
-                        result_type: Some(result_type),
-                        code_sequence: left_code_seq,
-                    }
+                    CodeObject::builder()
+                        .result(result_register)
+                        .result_type(result_type)
+                        .code_sequence(left_code_seq)
+                        .build()
                 }
                 Expr::None => panic!("Invalid AST: AST expression node contains expression variant `None`.")
             }
+        }
+
+        fn visit_assignment(&mut self, assigment: Assignment) -> CodeObject {
+            let Assignment {
+                lhs,
+                rhs,
+            } = assigment;
+
+            let rhs = self.visit_expression(rhs);
+
+            let (curr_operand, mut code_sequence) = (
+                // The result of a `CodeObject` returned
+                // by an expression should never be `None`.
+                // An expression should always evaluate to
+                // a result with a strong type.
+                rhs.result.unwrap(),
+                rhs.code_sequence
+            );
+
+            let assign_code = match lhs.sym_type {
+                SymbolType::String => panic!("Unsupported operation: Cannot ASSIGN to a string identifier!"),
+                SymbolType::Num(num_type) => {
+                    match num_type {
+                        NumType::Int => ThreeAddressCode::StoreI {
+                            lhs: LValueI::Id(IdentI(lhs.id)),
+                            rhs: curr_operand,
+                        },
+                        NumType::Float => ThreeAddressCode::StoreF {
+                            lhs: LValueF::Id(IdentF(lhs.id)),
+                            rhs: curr_operand,
+                        },
+                    }
+                }
+            };
+
+            code_sequence.push(assign_code);
+
+            CodeObject::builder()
+                .code_sequence(code_sequence)
+                .build()
+        }
+
+        fn visit_condition(&mut self, condition: Condition) -> CodeObject {
+            let Condition {
+                cmp_op,
+                lhs,
+                rhs,
+            } = condition;
+
+            let lhs = self.visit_expression(lhs);
+            let rhs = self.visit_expression(rhs);
+            let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
+            let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
+
+            let else_label = Label::new();
+
+            let curr_code = match cmp_op {
+                CmpOp::Lt => GTE {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+                CmpOp::Gt => LTE {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+                CmpOp::Eq => NE {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+                CmpOp::Ne => EQ {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+                CmpOp::Lte => GT {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+                CmpOp::Gte => LT {
+                    lhs: curr_left_operand,
+                    rhs: curr_right_operand,
+                    label: else_label,
+                },
+            };
+
+            left_code_seq.append(&mut right_code_seq);
+            left_code_seq.push(curr_code);
+
+            CodeObject::builder()
+                .jump_to(else_label)
+                .code_sequence(left_code_seq)
+                .build()
         }
     }
 }

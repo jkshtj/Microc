@@ -474,6 +474,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                     TinyCode::WriteS(identifier.0)
                 ],
             },
+            _ => todo!()
         }
     }
 }
