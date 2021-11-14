@@ -328,7 +328,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                             .borrow()
                             .get(&temp)
                             .copied()
-                            .unwrap_or_else(|| Register::new());
+                            .unwrap_or_else(Register::new);
                         INT_REGISTER_MAP
                             .borrow_mut()
                             .insert(temp, maybe_new_register);
@@ -416,7 +416,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                             .borrow()
                             .get(&temp)
                             .copied()
-                            .unwrap_or_else(|| Register::new());
+                            .unwrap_or_else(Register::new);
                         FLOAT_REGISTER_MAP
                             .borrow_mut()
                             .insert(temp, maybe_new_register);

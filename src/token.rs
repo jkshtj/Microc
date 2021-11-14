@@ -3,11 +3,11 @@ use derive_more::Display;
 #[allow(unused)]
 #[derive(Debug, Eq, PartialEq, Display, Copy, Clone)]
 pub enum TokenType {
-    KEYWORD,
-    OPERATOR,
-    LITERAL,
-    IDENTIFIER,
-    DISCARDABLE,
+    Keyword,
+    Operator,
+    Literal,
+    Identifier,
+    Discardable,
 }
 
 #[allow(unused)]
@@ -15,81 +15,81 @@ pub enum TokenType {
 pub enum Token {
     // Identifiers
     #[display(fmt = "{}", _1)]
-    IDENTIFIER(TokenType, String),
+    Identifier(TokenType, String),
 
     // Literals
     #[display(fmt = "{}", _1)]
-    INTLITERAL(TokenType, u32),
+    Intliteral(TokenType, u32),
     #[display(fmt = "{}", _1)]
-    FLOATLITERAL(TokenType, f64),
+    Floatliteral(TokenType, f64),
     #[display(fmt = "{}", _1)]
-    STRINGLITERAL(TokenType, String),
+    Stringliteral(TokenType, String),
 
     // Keywords
     #[display(fmt = "{}", _1)]
-    PROGRAM(TokenType, &'static str),
+    Program(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    BEGIN(TokenType, &'static str),
+    Begin(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    END(TokenType, &'static str),
+    End(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    FUNCTION(TokenType, &'static str),
+    Function(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    READ(TokenType, &'static str),
+    Read(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    WRITE(TokenType, &'static str),
+    Write(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    IF(TokenType, &'static str),
+    If(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    ELSE(TokenType, &'static str),
+    Else(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    FI(TokenType, &'static str),
+    Fi(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    FOR(TokenType, &'static str),
+    For(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    ROF(TokenType, &'static str),
+    Rof(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    RETURN(TokenType, &'static str),
+    Return(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    INT(TokenType, &'static str),
+    Int(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    VOID(TokenType, &'static str),
+    Void(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    STRING(TokenType, &'static str),
+    String(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    FLOAT(TokenType, &'static str),
+    Float(TokenType, &'static str),
 
     // Operators
     #[display(fmt = "{}", _1)]
-    ASSIGNMENT(TokenType, &'static str),
+    Assignment(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    ADD(TokenType, &'static str),
+    Add(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    SUB(TokenType, &'static str),
+    Sub(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    MUL(TokenType, &'static str),
+    Mul(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    DIV(TokenType, &'static str),
+    Div(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    EQ(TokenType, &'static str),
+    Eq(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    NE(TokenType, &'static str),
+    Ne(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    LT(TokenType, &'static str),
+    Lt(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    GT(TokenType, &'static str),
+    Gt(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    LTE(TokenType, &'static str),
+    Lte(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    GTE(TokenType, &'static str),
+    Gte(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    LPAREN(TokenType, &'static str),
+    Lparen(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    RPAREN(TokenType, &'static str),
+    Rparen(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    SEMICOLON(TokenType, &'static str),
+    Semicolon(TokenType, &'static str),
     #[display(fmt = "{}", _1)]
-    COMMA(TokenType, &'static str),
+    Comma(TokenType, &'static str),
 }
 
 #[cfg(test)]
@@ -98,7 +98,7 @@ mod test {
 
     #[test]
     fn token_returns_correct_value() {
-        let t = Token::INT(TokenType::KEYWORD, "INT");
+        let t = Token::Int(TokenType::Keyword, "INT");
 
         assert_eq!("INT", t.to_string());
     }

@@ -472,7 +472,7 @@ mod test {
             "global_symbol".to_owned(),
             "value1".to_owned(),
         ));
-        SymbolTable::add_symbol(symbol_under_global.clone());
+        SymbolTable::add_symbol(symbol_under_global);
         assert_eq!(
             SymbolType::String,
             SymbolTable::symbol_type_for("global_symbol").unwrap()
@@ -484,7 +484,7 @@ mod test {
             "child_of_global_symbol".to_owned(),
             "value1".to_owned(),
         ));
-        SymbolTable::add_symbol(symbol_under_child_of_global.clone());
+        SymbolTable::add_symbol(symbol_under_child_of_global);
         assert_eq!(
             SymbolType::String,
             SymbolTable::symbol_type_for("child_of_global_symbol").unwrap()
@@ -501,7 +501,7 @@ mod test {
             "global_symbol".to_owned(),
             "value1".to_owned(),
         ));
-        SymbolTable::add_symbol(symbol.clone());
+        SymbolTable::add_symbol(symbol);
         assert!(SymbolTable::symbol_type_for("global_symbol").is_some());
 
         SymbolTable::seal();
@@ -517,7 +517,7 @@ mod test {
             "value1".to_owned(),
         ));
         SymbolTable::add_symbol(symbol.clone());
-        assert!(SymbolTable::add_symbol(symbol.clone()).err().is_some());
+        assert!(SymbolTable::add_symbol(symbol).err().is_some());
     }
 
     #[test]

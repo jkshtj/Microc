@@ -108,7 +108,7 @@ fn main() {
             .collect();
 
         three_addr_codes
-            .clone()
+            
             .into_iter()
             .for_each(|code| println!(";{}", code));
         /*******************************/

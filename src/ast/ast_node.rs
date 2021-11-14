@@ -1,7 +1,7 @@
 use crate::symbol_table::SymbolType;
 
-/// Differentiates an addition `AddExpr` node
-/// from a subtraction `AddExpr` node.
+/// Differentiates an addition `Add` node
+/// from a subtraction `Add` node.
 #[derive(Debug, Copy, Clone)]
 pub enum AddOp {
     Add,
@@ -9,8 +9,8 @@ pub enum AddOp {
 }
 
 /// Differentiates an multiplication
-/// `MulExpr` node from a division
-/// `MulExpr` node.
+/// `Mul` node from a division
+/// `Mul` node.
 #[derive(Debug, Copy, Clone)]
 pub enum MulOp {
     Mul,
@@ -89,12 +89,12 @@ pub enum Expr {
     Id(Identifier),
     IntLiteral(i32),
     FloatLiteral(f64),
-    AddExpr {
+    Add {
         op: AddOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
-    MulExpr {
+    Mul {
         op: MulOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,

@@ -277,7 +277,7 @@ return_stmt: Stmt = {
 
 expr: Expr = {
     <mut expr_prefix: expr_prefix> <factor: factor> => {
-        if let Expr::AddExpr {
+        if let Expr::Add {
             op: _,
             lhs: _,
             ref mut rhs,
@@ -294,7 +294,7 @@ expr_prefix: Expr = {
     <mut expr_prefix: expr_prefix> <factor: factor> <mut addop: addop> => {
         match expr_prefix {
             Expr::None => {
-                if let Expr::AddExpr {
+                if let Expr::Add {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -303,7 +303,7 @@ expr_prefix: Expr = {
                 }
             },
             _ => {
-                if let Expr::AddExpr {
+                if let Expr::Add {
                     op: _,
                     lhs: _,
                     ref mut rhs,
@@ -311,7 +311,7 @@ expr_prefix: Expr = {
                     *rhs = Box::new(factor);
                 }
 
-                if let Expr::AddExpr {
+                if let Expr::Add {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -328,7 +328,7 @@ expr_prefix: Expr = {
 
 factor: Expr = {
     <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> => {
-        if let Expr::MulExpr {
+        if let Expr::Mul {
             op: _,
             lhs: _,
             ref mut rhs,
@@ -345,7 +345,7 @@ factor_prefix: Expr = {
     <mut factor_prefix: factor_prefix> <postfix_expr: postfix_expr> <mut mulop: mulop> => {
         match factor_prefix {
             Expr::None => {
-                if let Expr::MulExpr {
+                if let Expr::Mul {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -354,7 +354,7 @@ factor_prefix: Expr = {
                 }
             },
             _ => {
-                if let Expr::MulExpr {
+                if let Expr::Mul {
                     op: _,
                     lhs: _,
                     ref mut rhs,
@@ -362,7 +362,7 @@ factor_prefix: Expr = {
                     *rhs = Box::new(postfix_expr);
                 }
 
-                if let Expr::MulExpr {
+                if let Expr::Mul {
                     op: _,
                     ref mut lhs,
                     rhs: _,
@@ -418,14 +418,14 @@ primary: Expr = {
 
 addop: Expr = {
     "+" => {
-        Expr::AddExpr {
+        Expr::Add {
             op: AddOp::Add,
             lhs: Box::new(Expr::None),
             rhs: Box::new(Expr::None),
         }
     },
     "-" => {
-       Expr::AddExpr {
+       Expr::Add {
            op: AddOp::Sub,
            lhs: Box::new(Expr::None),
            rhs: Box::new(Expr::None),
@@ -435,14 +435,14 @@ addop: Expr = {
 
 mulop: Expr = {
     "*" => {
-       Expr::MulExpr {
+       Expr::Mul {
            op: MulOp::Mul,
            lhs: Box::new(Expr::None),
            rhs: Box::new(Expr::None),
        }
    },
     "/" => {
-      Expr::MulExpr {
+      Expr::Mul {
           op: MulOp::Div,
           lhs: Box::new(Expr::None),
           rhs: Box::new(Expr::None),

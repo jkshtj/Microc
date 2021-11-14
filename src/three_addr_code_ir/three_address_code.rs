@@ -79,37 +79,37 @@ pub enum ThreeAddressCode {
     #[display(fmt = "JUMP {}", _0)]
     Jump(Label),
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
-    GT {
+    Gt {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
-    LT {
+    Lt {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
-    GTE {
+    Gte {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
-    LTE {
+    Lte {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
-    NE {
+    Ne {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
-    EQ {
+    Eq {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
@@ -122,7 +122,7 @@ pub mod visit {
     use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
-        Jump, EQ, GT, GTE, LT, LTE, NE,
+        Jump, Eq, Gt, Gte, Lt, Lte, Ne,
     };
     use crate::three_addr_code_ir::{
         BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI,
@@ -155,10 +155,10 @@ pub mod visit {
         }
 
         pub fn walk_ast(&mut self, ast: AstNode) -> CodeObject {
-            return match ast {
+            match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
                 AstNode::Expr(expr) => self.visit_expression(expr),
-            };
+            }
         }
     }
 
@@ -246,10 +246,10 @@ pub mod visit {
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::For {
-                    init,
-                    condition,
-                    incr,
-                    body,
+                    init: _,
+                    condition: _,
+                    incr: _,
+                    body: _,
                 } => todo!(),
             }
         }
@@ -294,7 +294,7 @@ pub mod visit {
                         }])
                         .build()
                 }
-                Expr::AddExpr { op, lhs, rhs } => {
+                Expr::Add { op, lhs, rhs } => {
                     let lhs = self.visit_expression(Box::into_inner(lhs));
                     let rhs = self.visit_expression(Box::into_inner(rhs));
 
@@ -372,7 +372,7 @@ pub mod visit {
                         .code_sequence(left_code_seq)
                         .build()
                 }
-                Expr::MulExpr { op, lhs, rhs } => {
+                Expr::Mul { op, lhs, rhs } => {
                     let lhs = self.visit_expression(Box::into_inner(lhs));
                     let rhs = self.visit_expression(Box::into_inner(rhs));
 
@@ -502,32 +502,32 @@ pub mod visit {
             let else_label = Label::new();
 
             let curr_code = match cmp_op {
-                CmpOp::Lt => GTE {
+                CmpOp::Lt => Gte {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
                 },
-                CmpOp::Gt => LTE {
+                CmpOp::Gt => Lte {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
                 },
-                CmpOp::Eq => NE {
+                CmpOp::Eq => Ne {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
                 },
-                CmpOp::Ne => EQ {
+                CmpOp::Ne => Eq {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
                 },
-                CmpOp::Lte => GT {
+                CmpOp::Lte => Gt {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
                 },
-                CmpOp::Gte => LT {
+                CmpOp::Gte => Lt {
                     lhs: curr_left_operand,
                     rhs: curr_right_operand,
                     label: else_label,
@@ -563,9 +563,9 @@ mod test {
         //    (*) (a)
         //   /  \
         // (b)  (b)
-        let ast = AstNode::Expr(Expr::AddExpr {
+        let ast = AstNode::Expr(Expr::Add {
             op: AddOp::Add,
-            lhs: Box::new(Expr::MulExpr {
+            lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
@@ -605,9 +605,9 @@ mod test {
         //    (*) (a)
         //   /  \
         // (b)  (b)
-        let ast = AstNode::Expr(Expr::AddExpr {
+        let ast = AstNode::Expr(Expr::Add {
             op: AddOp::Add,
-            lhs: Box::new(Expr::MulExpr {
+            lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
@@ -641,9 +641,9 @@ mod test {
     #[test]
     #[should_panic]
     fn convert_math_expression_with_string_identifier_panics() {
-        let ast = AstNode::Expr(Expr::AddExpr {
+        let ast = AstNode::Expr(Expr::Add {
             op: AddOp::Add,
-            lhs: Box::new(Expr::MulExpr {
+            lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
@@ -669,9 +669,9 @@ mod test {
     #[test]
     #[should_panic]
     fn convert_math_expression_with_mixed_num_operand_types_panics() {
-        let ast = AstNode::Expr(Expr::AddExpr {
+        let ast = AstNode::Expr(Expr::Add {
             op: AddOp::Add,
-            lhs: Box::new(Expr::MulExpr {
+            lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
