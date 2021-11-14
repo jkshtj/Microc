@@ -86,7 +86,7 @@ pub enum ThreeAddressCode {
 
 
 pub mod visit {
-    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt};
+    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt, Assignment};
     use crate::ast::ast_node::visit::Visitor;
     use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, TempI, TempF};
@@ -183,11 +183,11 @@ pub mod visit {
                         code_sequence,
                     }
                 }
-                Stmt::Assign {
+                Stmt::Assign(Assignment {
                     lhs,
                     rhs
-                } => {
-                    let rhs = self.visit_expression(Box::into_inner(rhs));
+                }) => {
+                    let rhs = self.visit_expression(rhs);
 
                     let (curr_operand, mut code_sequence) = (
                         // The result of a `CodeObject` returned

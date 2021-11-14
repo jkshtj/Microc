@@ -17,6 +17,24 @@ pub enum MulOp {
     Div,
 }
 
+/// Represents the comparison
+/// operation in a boolean expression.
+#[derive(Debug, Copy, Clone)]
+pub enum CmpOp {
+    /// Less than
+    Lt,
+    /// Greater than
+    Gt,
+    /// Equal to
+    Eq,
+    /// Not equal to
+    Ne,
+    /// Less than or equal to
+    Lte,
+    /// Greater than or equal to
+    Gte,
+}
+
 /// Represents an identifier
 /// for a declared symbol.
 #[derive(Debug, Clone)]
@@ -26,20 +44,27 @@ pub struct Identifier {
 }
 
 /// Statements in Microc.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Read(Vec<Identifier>),
     Write(Vec<Identifier>),
-    Assign {
-        lhs: Identifier,
-        rhs: Box<Expr>,
-    },
+    Assign(Assignment),
 }
 
-/// Expressions in Microc.
-/// All expressions evaluate
-/// to a value that can be assigned.
-#[derive(Debug)]
+/// An assignment, which exists only
+/// for building different statements
+/// made up of assign semantics, such as,
+/// assign, if and for statements.
+#[derive(Debug, Clone)]
+pub struct Assignment {
+    pub lhs: Identifier,
+    pub rhs: Expr,
+}
+
+/// Math expressions in Microc
+/// that evaluate to a numeric
+/// value.
+#[derive(Debug, Clone)]
 pub enum Expr {
     Id(Identifier),
     IntLiteral(i32),

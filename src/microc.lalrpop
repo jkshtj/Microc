@@ -1,4 +1,4 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp, Expr, Stmt, Identifier};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Expr, Stmt, Identifier};
 use crate::symbol_table::{SymbolTable, NumType};
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
@@ -227,12 +227,10 @@ assign_expr: AstNode = {
             sym_type: SymbolTable::symbol_type_for(id).unwrap(),
         };
 
-        let rhs = Box::new(expr);
-
-        AstNode::Stmt(Stmt::Assign {
+        AstNode::Stmt(Stmt::Assign(Assignment {
             lhs,
-            rhs,
-        })
+            rhs: expr,
+        }))
     },
 };
 
