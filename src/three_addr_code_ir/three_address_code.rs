@@ -222,6 +222,11 @@ pub mod visit {
                         code_sequence,
                     }
                 }
+                Stmt::If {
+                    condition,
+                    then_block,
+                    else_block,
+                } => todo!(),
             }
         }
 

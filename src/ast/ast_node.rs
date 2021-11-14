@@ -49,6 +49,11 @@ pub enum Stmt {
     Read(Vec<Identifier>),
     Write(Vec<Identifier>),
     Assign(Assignment),
+    If {
+        condition: Condition,
+        then_block: Vec<Stmt>,
+        else_block: Vec<Stmt>,
+    }
 }
 
 /// An assignment, which exists only
@@ -58,6 +63,15 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub struct Assignment {
     pub lhs: Identifier,
+    pub rhs: Expr,
+}
+
+/// A boolean expression that evaluates
+/// to either true or false.
+#[derive(Debug, Clone)]
+pub struct Condition {
+    pub cmp_op: CmpOp,
+    pub lhs: Expr,
     pub rhs: Expr,
 }
 

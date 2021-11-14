@@ -1,4 +1,4 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Expr, Stmt, Identifier};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp};
 use crate::symbol_table::{SymbolTable, NumType};
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
@@ -173,7 +173,12 @@ func_declarations: Vec<AstNode> = {
 };
 
 func_decl: Vec<AstNode> = {
-    start_func "("param_decl_list")" BEGIN <func_body> end_func,
+    start_func "("param_decl_list")" BEGIN <func_body> end_func => {
+        <>
+        .into_iter()
+        .map(|stmt| AstNode::Stmt(stmt))
+        .collect()
+    },
 };
 
 start_func: () = {
@@ -188,14 +193,14 @@ end_func: () = {
     },
 };
 
-func_body: Vec<AstNode> = {
+// TODO: For STAGE 4 only -
+//  Instead of returning a Vec<Stmt> this should
+//  return a variant of AstNode itself, in the future.
+func_body: Vec<Stmt> = {
     decl <stmt_list>,
 };
 
-// TODO: For STAGE 4 only -
-//  Instead of returning a Vec<AstNode> this should
-//  return a variant of AstNode itself, in the future.
-stmt_list: Vec<AstNode> = {
+stmt_list: Vec<Stmt> = {
     <stmt: stmt> <mut stmt_list: stmt_list> => {
         stmt_list.push(stmt);
         stmt_list
@@ -203,38 +208,38 @@ stmt_list: Vec<AstNode> = {
     empty => vec![],
 };
 
-stmt: AstNode = {
+stmt: Stmt = {
     base_stmt,
     if_stmt => todo!(), // TODO: FIXME!
     for_stmt => todo!(), // TODO: FIXME
 };
 
-base_stmt: AstNode = {
+base_stmt: Stmt = {
     assign_stmt,
     read_stmt,
     write_stmt,
     return_stmt,
 };
 
-assign_stmt: AstNode = {
+assign_stmt: Stmt = {
     <assign_expr> ";",
 };
 
-assign_expr: AstNode = {
+assign_expr: Stmt = {
     <id: IDENTIFIER> ":=" <expr: expr> => {
         let lhs = Identifier {
             id: id.to_string(),
             sym_type: SymbolTable::symbol_type_for(id).unwrap(),
         };
 
-        AstNode::Stmt(Stmt::Assign(Assignment {
+        Stmt::Assign(Assignment {
             lhs,
             rhs: expr,
-        }))
+        })
     },
 };
 
-read_stmt: AstNode = {
+read_stmt: Stmt = {
     READ "(" <id_list> ")" ";" => {
         let id_list: Vec<Identifier> = <>
         .iter()
@@ -246,11 +251,11 @@ read_stmt: AstNode = {
         })
         .collect();
 
-        AstNode::Stmt(Stmt::Read(id_list))
+        Stmt::Read(id_list)
     },
 };
 
-write_stmt: AstNode = {
+write_stmt: Stmt = {
     WRITE "(" <id_list> ")" ";" => {
         let id_list: Vec<Identifier> = <>
         .iter()
@@ -262,11 +267,11 @@ write_stmt: AstNode = {
         })
         .collect();
 
-        AstNode::Stmt(Stmt::Write(id_list))
+        Stmt::Write(id_list)
     },
 };
 
-return_stmt: AstNode = {
+return_stmt: Stmt = {
     RETURN <expr> ";" => todo!(), // TODO: Fixme!
 };
 
@@ -445,8 +450,15 @@ mulop: Expr = {
    },
 };
 
-if_stmt: () = {
-    start_if "(" cond ")" decl stmt_list else_part end_if_or_else,
+if_stmt: Stmt = {
+    // TODO: What should `decl` return?
+    start_if "(" <condition: cond> ")" decl <then_block: stmt_list> <else_block: else_part> end_if_or_else => {
+        Stmt::If {
+            condition,
+            then_block,
+            else_block
+        }
+    },
 };
 
 start_if: () = {
@@ -461,9 +473,10 @@ end_if_or_else: () = {
     },
 };
 
-else_part: () = {
-    start_else decl stmt_list,
-    empty,
+else_part: Vec<Stmt> = {
+    // TODO: What should `decl` return?
+    start_else decl <stmt_list: stmt_list> => stmt_list,
+    empty => vec![],
 };
 
 start_else: () = {
@@ -475,17 +488,21 @@ start_else: () = {
     },
 };
 
-cond: () = {
-    expr compop expr,
+cond: Condition = {
+    <lhs: expr> <cmp_op: compop> <rhs: expr> => Condition {
+        cmp_op,
+        lhs,
+        rhs
+    },
 };
 
-compop: () = {
-    "<",
-    ">",
-    "=",
-    "!=",
-    "<=",
-    ">=",
+compop: CmpOp = {
+   "<" => CmpOp::Lt,
+    ">" => CmpOp::Gt,
+    "=" => CmpOp::Eq,
+    "!=" => CmpOp::Ne,
+    "<=" => CmpOp::Lte,
+    ">=" => CmpOp::Gte,
 };
 
 init_stmt: () = {
