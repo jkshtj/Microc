@@ -53,6 +53,12 @@ pub enum Stmt {
         condition: Condition,
         then_block: Vec<Stmt>,
         else_block: Vec<Stmt>,
+    },
+    For {
+        init: Option<Assignment>,
+        condition: Condition,
+        incr: Option<Assignment>,
+        body: Vec<Stmt>,
     }
 }
 

@@ -227,6 +227,12 @@ pub mod visit {
                     then_block,
                     else_block,
                 } => todo!(),
+                Stmt::For {
+                    init,
+                    condition,
+                    incr,
+                    body,
+                } => todo!(),
             }
         }
 

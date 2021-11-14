@@ -210,8 +210,8 @@ stmt_list: Vec<Stmt> = {
 
 stmt: Stmt = {
     base_stmt,
-    if_stmt => todo!(), // TODO: FIXME!
-    for_stmt => todo!(), // TODO: FIXME
+    if_stmt,
+    for_stmt,
 };
 
 base_stmt: Stmt = {
@@ -222,20 +222,20 @@ base_stmt: Stmt = {
 };
 
 assign_stmt: Stmt = {
-    <assign_expr> ";",
+    <assign_expr> ";" => Stmt::Assign(<>),
 };
 
-assign_expr: Stmt = {
+assign_expr: Assignment = {
     <id: IDENTIFIER> ":=" <expr: expr> => {
         let lhs = Identifier {
             id: id.to_string(),
             sym_type: SymbolTable::symbol_type_for(id).unwrap(),
         };
 
-        Stmt::Assign(Assignment {
+        Assignment {
             lhs,
             rhs: expr,
-        })
+        }
     },
 };
 
@@ -505,18 +505,26 @@ compop: CmpOp = {
     ">=" => CmpOp::Gte,
 };
 
-init_stmt: () = {
-    assign_expr,
-    empty,
+init_stmt: Option<Assignment> = {
+    <assign_expr> => Some(<>),
+    empty => None,
 };
 
-incr_stmt: () = {
-    assign_expr,
-    empty,
+incr_stmt: Option<Assignment> = {
+    <assign_expr> => Some(<>),
+    empty => None,
 };
 
-for_stmt: () = {
-    start_for "(" init_stmt ";" cond ";" incr_stmt ")" decl stmt_list end_for,
+for_stmt: Stmt = {
+    // TODO: What should `decl` return?
+    start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" decl <body: stmt_list> end_for => {
+        Stmt::For {
+            init,
+            condition,
+            incr,
+            body,
+        }
+    }
 };
 
 start_for: () = {
