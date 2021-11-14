@@ -32,9 +32,7 @@ pub struct IntDecl {
 
 impl IntDecl {
     pub fn new(name: String) -> Self {
-        IntDecl {
-            name,
-        }
+        IntDecl { name }
     }
 
     pub fn get_name(&self) -> &str {
@@ -54,9 +52,7 @@ pub struct FloatDecl {
 
 impl FloatDecl {
     pub fn new(name: String) -> Self {
-        FloatDecl {
-            name,
-        }
+        FloatDecl { name }
     }
 
     pub fn get_name(&self) -> &str {

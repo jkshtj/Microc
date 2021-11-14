@@ -98,10 +98,7 @@ mod test {
 
     #[test]
     fn token_returns_correct_value() {
-        let t = Token::INT(
-            TokenType::KEYWORD,
-            "INT",
-        );
+        let t = Token::INT(TokenType::KEYWORD, "INT");
 
         assert_eq!("INT", t.to_string());
     }

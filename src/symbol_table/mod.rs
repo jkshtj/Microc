@@ -19,7 +19,11 @@ lazy_static::lazy_static! {
 /// Type to represent errors originating
 /// from use of undeclared symbols.
 #[derive(Debug, derive_more::Error, derive_more::Display, Getters)]
-#[display(fmt = "Symbol [{}] was declared in scope [{}] multiple times.", symbol_name, scope_name)]
+#[display(
+    fmt = "Symbol [{}] was declared in scope [{}] multiple times.",
+    symbol_name,
+    scope_name
+)]
 #[getset(get = "pub")]
 pub struct DeclarationError {
     scope_name: String,
@@ -28,7 +32,10 @@ pub struct DeclarationError {
 
 impl DeclarationError {
     pub fn new(scope_name: String, symbol_name: String) -> Self {
-        DeclarationError { scope_name, symbol_name }
+        DeclarationError {
+            scope_name,
+            symbol_name,
+        }
     }
 }
 
@@ -52,10 +59,7 @@ impl SymbolTable {
         if let SymbolTable::Active(ref mut scope_tree) = *symbol_table {
             let scopes = std::mem::take(&mut scope_tree.scopes);
             *symbol_table = SymbolTable::Sealed;
-            scopes
-                .into_iter()
-                .flat_map(|scope| scope.symbols)
-                .collect()
+            scopes.into_iter().flat_map(|scope| scope.symbols).collect()
         } else {
             panic!("Symbol table has been sealed.");
         }
@@ -207,9 +211,9 @@ impl Display for ScopeTree {
         if let Some(decl_err) = &self.decl_error {
             writeln!(f, "DECLARATION ERROR {}", decl_err.symbol_name())?
         } else {
-            self.scopes.iter().try_for_each(|scope| {
-                writeln!(f, "{}", scope)
-            })?;
+            self.scopes
+                .iter()
+                .try_for_each(|scope| writeln!(f, "{}", scope))?;
         }
         Ok(())
     }
@@ -218,9 +222,7 @@ impl Display for ScopeTree {
 impl ScopeTree {
     fn new() -> Self {
         Self {
-            scopes: vec![
-                Scope::new("GLOBAL", None)
-            ],
+            scopes: vec![Scope::new("GLOBAL", None)],
             active_scope_stack: vec![0],
             anonymous_scope_counter: 0,
             decl_error: None,
@@ -271,12 +273,11 @@ impl ScopeTree {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum NumType {
     Int,
-    Float
+    Float,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum SymbolType
-{
+pub enum SymbolType {
     String,
     Num(NumType),
 }
@@ -292,18 +293,15 @@ struct Scope {
 impl Display for Scope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Symbol table {}", self.name)?;
-        self.symbols.iter().try_for_each(|symbol| {
-            writeln!(f, "{}", symbol)
-        })?;
+        self.symbols
+            .iter()
+            .try_for_each(|symbol| writeln!(f, "{}", symbol))?;
         Ok(())
     }
 }
 
 impl Scope {
-    fn new<T: ToString>(
-        name: T,
-        parent_id: Option<usize>,
-    ) -> Self {
+    fn new<T: ToString>(name: T, parent_id: Option<usize>) -> Self {
         Self {
             name: name.to_string(),
             parent_id,
@@ -315,7 +313,10 @@ impl Scope {
     fn add_symbol(&mut self, symbol: Symbol) -> Result<(), DeclarationError> {
         let symbol_name = symbol.get_name();
         if self.contains_symbol(symbol_name) {
-            return Err(DeclarationError::new(self.name.clone(), symbol_name.to_string()));
+            return Err(DeclarationError::new(
+                self.name.clone(),
+                symbol_name.to_string(),
+            ));
         }
         self.symbol_set.insert(symbol_name.to_owned());
         self.symbols.push(symbol);
@@ -456,7 +457,10 @@ mod test {
 
         // Should be added under "ChildOfGlobal" scope
         SymbolTable::add_symbol(symbol_under_child_of_global.clone());
-        assert!(SymbolTable::is_symbol_under(1, &symbol_under_child_of_global));
+        assert!(SymbolTable::is_symbol_under(
+            1,
+            &symbol_under_child_of_global
+        ));
     }
 
     #[test]
@@ -469,7 +473,10 @@ mod test {
             "value1".to_owned(),
         ));
         SymbolTable::add_symbol(symbol_under_global.clone());
-        assert_eq!(SymbolType::String, SymbolTable::symbol_type_for("global_symbol").unwrap());
+        assert_eq!(
+            SymbolType::String,
+            SymbolTable::symbol_type_for("global_symbol").unwrap()
+        );
         assert!(SymbolTable::symbol_type_for("non_existent").is_none());
 
         SymbolTable::add_scope("ChildOfGlobal");
@@ -478,7 +485,10 @@ mod test {
             "value1".to_owned(),
         ));
         SymbolTable::add_symbol(symbol_under_child_of_global.clone());
-        assert_eq!(SymbolType::String, SymbolTable::symbol_type_for("child_of_global_symbol").unwrap());
+        assert_eq!(
+            SymbolType::String,
+            SymbolTable::symbol_type_for("child_of_global_symbol").unwrap()
+        );
         assert!(SymbolTable::symbol_type_for("non_existent").is_none());
     }
 

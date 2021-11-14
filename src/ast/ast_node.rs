@@ -59,7 +59,7 @@ pub enum Stmt {
         condition: Condition,
         incr: Option<Assignment>,
         body: Vec<Stmt>,
-    }
+    },
 }
 
 /// An assignment, which exists only

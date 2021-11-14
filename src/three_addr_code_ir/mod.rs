@@ -4,11 +4,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use derive_more::Display;
 
-use crate::symbol_table::{NumType, SymbolType};
 use crate::ast::ast_node::Identifier;
+use crate::symbol_table::{NumType, SymbolType};
 
 pub mod three_address_code;
-
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 static LABEL_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -110,7 +109,6 @@ pub enum RValue {
     FloatLiteral(f64),
 }
 
-
 #[derive(Debug, Clone, Display)]
 pub enum BinaryExprOperand {
     LValueI(LValueI),
@@ -185,11 +183,9 @@ impl From<SymbolType> for ResultType {
     fn from(symbol_type: SymbolType) -> Self {
         match symbol_type {
             SymbolType::String => ResultType::String,
-            SymbolType::Num(t) => {
-                match t {
-                    NumType::Int => ResultType::Int,
-                    NumType::Float => ResultType::Float,
-                }
+            SymbolType::Num(t) => match t {
+                NumType::Int => ResultType::Int,
+                NumType::Float => ResultType::Float,
             },
         }
     }

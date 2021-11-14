@@ -1,6 +1,8 @@
 use derive_more::Display;
 
-use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, TempI, TempF, Label};
+use crate::three_addr_code_ir::{
+    BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, TempF, TempI,
+};
 
 #[derive(Debug, Clone, Display)]
 pub enum ThreeAddressCode {
@@ -34,13 +36,9 @@ pub enum ThreeAddressCode {
         rhs: BinaryExprOperand,
     },
     #[display(fmt = "READI {}", identifier)]
-    ReadI {
-        identifier: IdentI,
-    },
+    ReadI { identifier: IdentI },
     #[display(fmt = "WRITEI {}", identifier)]
-    WriteI {
-        identifier: IdentI,
-    },
+    WriteI { identifier: IdentI },
     #[display(fmt = "ADDF {} {} {}", lhs, rhs, temp_result)]
     AddF {
         lhs: BinaryExprOperand,
@@ -71,17 +69,11 @@ pub enum ThreeAddressCode {
         rhs: BinaryExprOperand,
     },
     #[display(fmt = "READF {}", identifier)]
-    ReadF {
-        identifier: IdentF,
-    },
+    ReadF { identifier: IdentF },
     #[display(fmt = "WRITEF {}", identifier)]
-    WriteF {
-        identifier: IdentF,
-    },
+    WriteF { identifier: IdentF },
     #[display(fmt = "WRITES {}", identifier)]
-    WriteS {
-        identifier: IdentS,
-    },
+    WriteS { identifier: IdentS },
     #[display(fmt = "LABEL {}", _0)]
     Label(Label),
     #[display(fmt = "JUMP {}", _0)]
@@ -124,14 +116,17 @@ pub enum ThreeAddressCode {
     },
 }
 
-
 pub mod visit {
-    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Stmt, Assignment, Condition, CmpOp};
     use crate::ast::ast_node::visit::Visitor;
+    use crate::ast::ast_node::{AddOp, Assignment, AstNode, CmpOp, Condition, Expr, MulOp, Stmt};
     use crate::symbol_table::{NumType, SymbolType};
-    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, ResultType, TempI, TempF, Label};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{GT, LT, EQ, NE, LTE, GTE, Jump};
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
+        Jump, EQ, GT, GTE, LT, LTE, NE,
+    };
+    use crate::three_addr_code_ir::{
+        BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI,
+    };
     use typed_builder::TypedBuilder;
 
     #[derive(Debug, Clone, TypedBuilder)]
@@ -152,7 +147,10 @@ pub mod visit {
             match (left, right) {
                 (ResultType::Float, ResultType::Float) => ResultType::Float,
                 (ResultType::Int, ResultType::Int) => ResultType::Int,
-                (_, _) => panic!("Unsupported result type combination. Left: [{:?}], Right: [{:?}]", left, right),
+                (_, _) => panic!(
+                    "Unsupported result type combination. Left: [{:?}], Right: [{:?}]",
+                    left, right
+                ),
             }
         }
 
@@ -160,7 +158,7 @@ pub mod visit {
             return match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
                 AstNode::Expr(expr) => self.visit_expression(expr),
-            }
+            };
         }
     }
 
@@ -175,52 +173,42 @@ pub mod visit {
                 Stmt::Read(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| {
-                            match identifier.sym_type {
-                                SymbolType::String => panic!("Unsupported operation: cannot READ into string identifier!"),
-                                SymbolType::Num(num_type) => {
-                                    match num_type {
-                                        NumType::Int => ThreeAddressCode::ReadI {
-                                            identifier: identifier.into(),
-                                        },
-                                        NumType::Float => ThreeAddressCode::ReadF {
-                                            identifier: identifier.into(),
-                                        },
-                                    }
-                                }
+                        .map(|identifier| match identifier.sym_type {
+                            SymbolType::String => {
+                                panic!("Unsupported operation: cannot READ into string identifier!")
                             }
+                            SymbolType::Num(num_type) => match num_type {
+                                NumType::Int => ThreeAddressCode::ReadI {
+                                    identifier: identifier.into(),
+                                },
+                                NumType::Float => ThreeAddressCode::ReadF {
+                                    identifier: identifier.into(),
+                                },
+                            },
                         })
                         .collect();
 
-                    CodeObject::builder()
-                        .code_sequence(code_sequence)
-                        .build()
+                    CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::Write(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| {
-                            match identifier.sym_type {
-                                SymbolType::String => ThreeAddressCode::WriteS {
+                        .map(|identifier| match identifier.sym_type {
+                            SymbolType::String => ThreeAddressCode::WriteS {
+                                identifier: identifier.into(),
+                            },
+                            SymbolType::Num(num_type) => match num_type {
+                                NumType::Int => ThreeAddressCode::WriteI {
                                     identifier: identifier.into(),
                                 },
-                                SymbolType::Num(num_type) => {
-                                    match num_type {
-                                        NumType::Int => ThreeAddressCode::WriteI {
-                                            identifier: identifier.into(),
-                                        },
-                                        NumType::Float => ThreeAddressCode::WriteF {
-                                            identifier: identifier.into(),
-                                        },
-                                    }
-                                }
-                            }
+                                NumType::Float => ThreeAddressCode::WriteF {
+                                    identifier: identifier.into(),
+                                },
+                            },
                         })
                         .collect();
 
-                    CodeObject::builder()
-                        .code_sequence(code_sequence)
-                        .build()
+                    CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::Assign(assignment) => self.visit_assignment(assignment),
                 Stmt::If {
@@ -237,11 +225,9 @@ pub mod visit {
                     let mut code_sequence = condition.code_sequence;
 
                     // `then` block statements
-                    then_block
-                        .into_iter()
-                        .for_each(|stmt| {
-                            code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
-                        });
+                    then_block.into_iter().for_each(|stmt| {
+                        code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                    });
 
                     // Jump to break_label
                     code_sequence.push(Jump(break_label));
@@ -250,19 +236,15 @@ pub mod visit {
                     code_sequence.push(ThreeAddressCode::Label(else_label));
 
                     // `else` block statements
-                    else_block
-                        .into_iter()
-                        .for_each(|stmt| {
-                            code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
-                        });
+                    else_block.into_iter().for_each(|stmt| {
+                        code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                    });
 
                     // if-else block break-out label
                     code_sequence.push(ThreeAddressCode::Label(break_label));
 
-                    CodeObject::builder()
-                        .code_sequence(code_sequence)
-                        .build()
-                },
+                    CodeObject::builder().code_sequence(code_sequence).build()
+                }
                 Stmt::For {
                     init,
                     condition,
@@ -312,11 +294,7 @@ pub mod visit {
                         }])
                         .build()
                 }
-                Expr::AddExpr {
-                    op,
-                    lhs,
-                    rhs
-                } => {
+                Expr::AddExpr { op, lhs, rhs } => {
                     let lhs = self.visit_expression(Box::into_inner(lhs));
                     let rhs = self.visit_expression(Box::into_inner(rhs));
 
@@ -325,10 +303,12 @@ pub mod visit {
                     // should always evaluate to a result with a strong type.
                     let result_type = ThreeAddressCodeVisitor::combined_result_type(
                         lhs.result_type.unwrap(),
-                        rhs.result_type.unwrap()
+                        rhs.result_type.unwrap(),
                     );
-                    let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
-                    let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
+                    let (curr_left_operand, mut left_code_seq) =
+                        (lhs.result.unwrap(), lhs.code_sequence);
+                    let (curr_right_operand, mut right_code_seq) =
+                        (rhs.result.unwrap(), rhs.code_sequence);
 
                     let (curr_code, result_register) = match op {
                         AddOp::Add => match result_type {
@@ -341,9 +321,9 @@ pub mod visit {
                                         rhs: curr_right_operand,
                                         temp_result,
                                     },
-                                    temp_result.into()
+                                    temp_result.into(),
                                 )
-                            },
+                            }
                             ResultType::Float => {
                                 let temp_result = TempF::new();
                                 (
@@ -352,9 +332,9 @@ pub mod visit {
                                         rhs: curr_right_operand,
                                         temp_result,
                                     },
-                                    temp_result.into()
+                                    temp_result.into(),
                                 )
-                            },
+                            }
                         },
                         AddOp::Sub => match result_type {
                             ResultType::String => unreachable!(),
@@ -366,9 +346,9 @@ pub mod visit {
                                         rhs: curr_right_operand,
                                         temp_result,
                                     },
-                                    temp_result.into()
+                                    temp_result.into(),
                                 )
-                            },
+                            }
                             ResultType::Float => {
                                 let temp_result = TempF::new();
                                 (
@@ -377,84 +357,7 @@ pub mod visit {
                                         rhs: curr_right_operand,
                                         temp_result,
                                     },
-                                    temp_result.into()
-                                )
-                            },
-                        },
-                    };
-
-                    left_code_seq.append(&mut right_code_seq);
-                    left_code_seq.push(curr_code);
-
-                    CodeObject::builder()
-                        .result(result_register)
-                        .result_type(result_type)
-                        .code_sequence(left_code_seq)
-                        .build()
-                }
-                Expr::MulExpr {
-                    op,
-                    lhs,
-                    rhs,
-                } => {
-                    let lhs = self.visit_expression(Box::into_inner(lhs));
-                    let rhs = self.visit_expression(Box::into_inner(rhs));
-
-                    // The result and result_type of a `CodeObject` returned
-                    // by an expression should never be `None`. An expression
-                    // should always evaluate to a result with a strong type.
-                    let result_type = ThreeAddressCodeVisitor::combined_result_type(lhs.result_type.unwrap(), rhs.result_type.unwrap());
-                    let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
-                    let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
-
-                    let (curr_code, result_register) = match op {
-                        MulOp::Mul => match result_type {
-                            ResultType::String => unreachable!(),
-                            ResultType::Int => {
-                                let temp_result = TempI::new();
-                                (
-                                    ThreeAddressCode::MulI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
-                                        temp_result,
-                                    },
-                                    temp_result.into()
-                                )
-                            },
-                            ResultType::Float => {
-                                let temp_result = TempF::new();
-                                (
-                                    ThreeAddressCode::MulF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
-                                        temp_result,
-                                    },
-                                    temp_result.into()
-                                )
-                            },
-                        },
-                        MulOp::Div => match result_type {
-                            ResultType::String => unreachable!(),
-                            ResultType::Int => {
-                                let temp_result = TempI::new();
-                                (
-                                    ThreeAddressCode::DivI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
-                                        temp_result,
-                                    },
-                                    temp_result.into()
-                                )
-                            },
-                            ResultType::Float => {
-                                let temp_result = TempF::new();
-                                (
-                                    ThreeAddressCode::DivF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
-                                        temp_result,
-                                    },
-                                    temp_result.into()
+                                    temp_result.into(),
                                 )
                             }
                         },
@@ -469,15 +372,92 @@ pub mod visit {
                         .code_sequence(left_code_seq)
                         .build()
                 }
-                Expr::None => panic!("Invalid AST: AST expression node contains expression variant `None`.")
+                Expr::MulExpr { op, lhs, rhs } => {
+                    let lhs = self.visit_expression(Box::into_inner(lhs));
+                    let rhs = self.visit_expression(Box::into_inner(rhs));
+
+                    // The result and result_type of a `CodeObject` returned
+                    // by an expression should never be `None`. An expression
+                    // should always evaluate to a result with a strong type.
+                    let result_type = ThreeAddressCodeVisitor::combined_result_type(
+                        lhs.result_type.unwrap(),
+                        rhs.result_type.unwrap(),
+                    );
+                    let (curr_left_operand, mut left_code_seq) =
+                        (lhs.result.unwrap(), lhs.code_sequence);
+                    let (curr_right_operand, mut right_code_seq) =
+                        (rhs.result.unwrap(), rhs.code_sequence);
+
+                    let (curr_code, result_register) = match op {
+                        MulOp::Mul => match result_type {
+                            ResultType::String => unreachable!(),
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::MulI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into(),
+                                )
+                            }
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::MulF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into(),
+                                )
+                            }
+                        },
+                        MulOp::Div => match result_type {
+                            ResultType::String => unreachable!(),
+                            ResultType::Int => {
+                                let temp_result = TempI::new();
+                                (
+                                    ThreeAddressCode::DivI {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into(),
+                                )
+                            }
+                            ResultType::Float => {
+                                let temp_result = TempF::new();
+                                (
+                                    ThreeAddressCode::DivF {
+                                        lhs: curr_left_operand,
+                                        rhs: curr_right_operand,
+                                        temp_result,
+                                    },
+                                    temp_result.into(),
+                                )
+                            }
+                        },
+                    };
+
+                    left_code_seq.append(&mut right_code_seq);
+                    left_code_seq.push(curr_code);
+
+                    CodeObject::builder()
+                        .result(result_register)
+                        .result_type(result_type)
+                        .code_sequence(left_code_seq)
+                        .build()
+                }
+                Expr::None => {
+                    panic!("Invalid AST: AST expression node contains expression variant `None`.")
+                }
             }
         }
 
         fn visit_assignment(&mut self, assigment: Assignment) -> CodeObject {
-            let Assignment {
-                lhs,
-                rhs,
-            } = assigment;
+            let Assignment { lhs, rhs } = assigment;
 
             let rhs = self.visit_expression(rhs);
 
@@ -487,38 +467,32 @@ pub mod visit {
                 // An expression should always evaluate to
                 // a result with a strong type.
                 rhs.result.unwrap(),
-                rhs.code_sequence
+                rhs.code_sequence,
             );
 
             let assign_code = match lhs.sym_type {
-                SymbolType::String => panic!("Unsupported operation: Cannot ASSIGN to a string identifier!"),
-                SymbolType::Num(num_type) => {
-                    match num_type {
-                        NumType::Int => ThreeAddressCode::StoreI {
-                            lhs: LValueI::Id(IdentI(lhs.id)),
-                            rhs: curr_operand,
-                        },
-                        NumType::Float => ThreeAddressCode::StoreF {
-                            lhs: LValueF::Id(IdentF(lhs.id)),
-                            rhs: curr_operand,
-                        },
-                    }
+                SymbolType::String => {
+                    panic!("Unsupported operation: Cannot ASSIGN to a string identifier!")
                 }
+                SymbolType::Num(num_type) => match num_type {
+                    NumType::Int => ThreeAddressCode::StoreI {
+                        lhs: LValueI::Id(IdentI(lhs.id)),
+                        rhs: curr_operand,
+                    },
+                    NumType::Float => ThreeAddressCode::StoreF {
+                        lhs: LValueF::Id(IdentF(lhs.id)),
+                        rhs: curr_operand,
+                    },
+                },
             };
 
             code_sequence.push(assign_code);
 
-            CodeObject::builder()
-                .code_sequence(code_sequence)
-                .build()
+            CodeObject::builder().code_sequence(code_sequence).build()
         }
 
         fn visit_condition(&mut self, condition: Condition) -> CodeObject {
-            let Condition {
-                cmp_op,
-                lhs,
-                rhs,
-            } = condition;
+            let Condition { cmp_op, lhs, rhs } = condition;
 
             let lhs = self.visit_expression(lhs);
             let rhs = self.visit_expression(rhs);
@@ -571,13 +545,12 @@ pub mod visit {
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use crate::ast::ast_node::{AddOp, AstNode, Expr, MulOp, Identifier};
+    use crate::ast::ast_node::{AddOp, AstNode, Expr, Identifier, MulOp};
     use crate::symbol_table::{NumType, SymbolType};
-    use crate::three_addr_code_ir::ResultType;
     use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
+    use crate::three_addr_code_ir::ResultType;
 
     use super::*;
 
@@ -596,16 +569,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int)
+                    sym_type: SymbolType::Num(NumType::Int),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int)
+                    sym_type: SymbolType::Num(NumType::Int),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Int)
+                sym_type: SymbolType::Num(NumType::Int),
             })),
         });
 
@@ -615,7 +588,10 @@ mod test {
 
         dbg!(code_object.clone());
 
-        assert!(matches!(code_object.result, Some(BinaryExprOperand::LValueI(LValueI::Temp(_)))));
+        assert!(matches!(
+            code_object.result,
+            Some(BinaryExprOperand::LValueI(LValueI::Temp(_)))
+        ));
         assert_eq!(ResultType::Int, code_object.result_type.unwrap());
         assert_eq!(2, code_object.code_sequence.len());
     }
@@ -635,16 +611,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float)
+                    sym_type: SymbolType::Num(NumType::Float),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float)
+                    sym_type: SymbolType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float)
+                sym_type: SymbolType::Num(NumType::Float),
             })),
         });
 
@@ -654,7 +630,10 @@ mod test {
 
         dbg!(code_object.clone());
 
-        assert!(matches!(code_object.result, Some(BinaryExprOperand::LValueF(LValueF::Temp(_)))));
+        assert!(matches!(
+            code_object.result,
+            Some(BinaryExprOperand::LValueF(LValueF::Temp(_)))
+        ));
         assert_eq!(ResultType::Float, code_object.result_type.unwrap());
         assert_eq!(2, code_object.code_sequence.len());
     }
@@ -668,16 +647,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::String
+                    sym_type: SymbolType::String,
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float)
+                    sym_type: SymbolType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float)
+                sym_type: SymbolType::Num(NumType::Float),
             })),
         });
 
@@ -696,16 +675,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int)
+                    sym_type: SymbolType::Num(NumType::Int),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float)
+                    sym_type: SymbolType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float)
+                sym_type: SymbolType::Num(NumType::Float),
             })),
         });
 

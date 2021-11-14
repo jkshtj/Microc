@@ -6,8 +6,8 @@ use atomic_refcell::AtomicRefCell;
 use derive_more::Display;
 
 use crate::symbol_table::{Symbol, SymbolTable};
-use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
 
 static REGISTER_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -173,7 +173,7 @@ impl TinyCode {
                         TinyCode::Move(
                             OpmrL::Int(OpmrIL::Location(Opmr::Reg(existing_reg))),
                             Opmr::Reg(new_reg),
-                        )
+                        ),
                     )
                 }
                 LValueI::Id(id) => {
@@ -183,7 +183,7 @@ impl TinyCode {
                         TinyCode::Move(
                             OpmrL::Int(OpmrIL::Location(Opmr::Id(id.0))),
                             Opmr::Reg(new_reg),
-                        )
+                        ),
                     )
                 }
             },
@@ -196,7 +196,7 @@ impl TinyCode {
                         TinyCode::Move(
                             OpmrL::Float(OpmrFL::Location(Opmr::Reg(existing_reg))),
                             Opmr::Reg(new_reg),
-                        )
+                        ),
                     )
                 }
                 LValueF::Id(id) => {
@@ -206,62 +206,48 @@ impl TinyCode {
                         TinyCode::Move(
                             OpmrL::Float(OpmrFL::Location(Opmr::Id(id.0))),
                             Opmr::Reg(new_reg),
-                        )
+                        ),
                     )
                 }
             },
-            BinaryExprOperand::RValue(rval) => {
-                match rval {
-                    RValue::IntLiteral(n) => {
-                        let new_reg = Register::new();
-                        (
-                            new_reg,
-                            TinyCode::Move(
-                                OpmrL::Int(OpmrIL::Literal(n)),
-                                Opmr::Reg(new_reg),
-                            )
-                        )
-                    }
-                    RValue::FloatLiteral(n) => {
-                        let new_reg = Register::new();
-                        (
-                            new_reg,
-                            TinyCode::Move(
-                                OpmrL::Float(OpmrFL::Literal(n)),
-                                Opmr::Reg(new_reg),
-                            )
-                        )
-                    }
+            BinaryExprOperand::RValue(rval) => match rval {
+                RValue::IntLiteral(n) => {
+                    let new_reg = Register::new();
+                    (
+                        new_reg,
+                        TinyCode::Move(OpmrL::Int(OpmrIL::Literal(n)), Opmr::Reg(new_reg)),
+                    )
                 }
-            }
+                RValue::FloatLiteral(n) => {
+                    let new_reg = Register::new();
+                    (
+                        new_reg,
+                        TinyCode::Move(OpmrL::Float(OpmrFL::Literal(n)), Opmr::Reg(new_reg)),
+                    )
+                }
+            },
         }
     }
 
     fn process_tac_right_operand(operand: BinaryExprOperand) -> OpmrL {
         match operand {
-            BinaryExprOperand::LValueI(lval) => {
-                match lval {
-                    LValueI::Temp(temp) => {
-                        let existing_reg = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
-                        OpmrL::Int(OpmrIL::Location(Opmr::Reg(existing_reg)))
-                    }
-                    LValueI::Id(id) => OpmrL::Int(OpmrIL::Location(Opmr::Id(id.0)))
+            BinaryExprOperand::LValueI(lval) => match lval {
+                LValueI::Temp(temp) => {
+                    let existing_reg = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
+                    OpmrL::Int(OpmrIL::Location(Opmr::Reg(existing_reg)))
                 }
+                LValueI::Id(id) => OpmrL::Int(OpmrIL::Location(Opmr::Id(id.0))),
             },
-            BinaryExprOperand::LValueF(lval) => {
-                match lval {
-                    LValueF::Temp(temp) => {
-                        let existing_reg = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
-                        OpmrL::Float(OpmrFL::Location(Opmr::Reg(existing_reg)))
-                    }
-                    LValueF::Id(id) => OpmrL::Float(OpmrFL::Location(Opmr::Id(id.0)))
+            BinaryExprOperand::LValueF(lval) => match lval {
+                LValueF::Temp(temp) => {
+                    let existing_reg = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
+                    OpmrL::Float(OpmrFL::Location(Opmr::Reg(existing_reg)))
                 }
+                LValueF::Id(id) => OpmrL::Float(OpmrFL::Location(Opmr::Id(id.0))),
             },
-            BinaryExprOperand::RValue(rval) => {
-                match rval {
-                    RValue::IntLiteral(n) => OpmrL::Int(OpmrIL::Literal(n)),
-                    RValue::FloatLiteral(n) => OpmrL::Float(OpmrFL::Literal(n)),
-                }
+            BinaryExprOperand::RValue(rval) => match rval {
+                RValue::IntLiteral(n) => OpmrL::Int(OpmrIL::Literal(n)),
+                RValue::FloatLiteral(n) => OpmrL::Float(OpmrFL::Literal(n)),
             },
         }
     }
@@ -278,7 +264,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
             ThreeAddressCode::AddI {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_int_opmrl();
@@ -287,13 +273,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, add_code]
+                    sequence: vec![move_code, add_code],
                 }
-            },
+            }
             ThreeAddressCode::SubI {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_int_opmrl();
@@ -302,13 +288,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, sub_code]
+                    sequence: vec![move_code, sub_code],
                 }
-            },
+            }
             ThreeAddressCode::MulI {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_int_opmrl();
@@ -317,13 +303,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, mul_code]
+                    sequence: vec![move_code, mul_code],
                 }
-            },
+            }
             ThreeAddressCode::DivI {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_int_opmrl();
@@ -332,49 +318,41 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, div_code]
+                    sequence: vec![move_code, div_code],
                 }
-            },
-            ThreeAddressCode::StoreI {
-                lhs,
-                rhs,
-            } => {
-                let operand1 =  match lhs {
+            }
+            ThreeAddressCode::StoreI { lhs, rhs } => {
+                let operand1 = match lhs {
                     LValueI::Temp(temp) => {
-                        let maybe_new_register = INT_REGISTER_MAP.borrow()
+                        let maybe_new_register = INT_REGISTER_MAP
+                            .borrow()
                             .get(&temp)
                             .copied()
                             .unwrap_or_else(|| Register::new());
-                        INT_REGISTER_MAP.borrow_mut().insert(temp, maybe_new_register);
+                        INT_REGISTER_MAP
+                            .borrow_mut()
+                            .insert(temp, maybe_new_register);
                         Opmr::Reg(maybe_new_register)
                     }
-                    LValueI::Id(id) => Opmr::Id(id.0)
+                    LValueI::Id(id) => Opmr::Id(id.0),
                 };
                 let operand2 = TinyCode::process_tac_right_operand(rhs);
                 let move_code = TinyCode::Move(operand2, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code]
+                    sequence: vec![move_code],
                 }
+            }
+            ThreeAddressCode::ReadI { identifier } => TinyCodeSequence {
+                sequence: vec![TinyCode::ReadI(Opmr::Id(identifier.0))],
             },
-            ThreeAddressCode::ReadI {
-                identifier
-            } => TinyCodeSequence {
-                sequence: vec![
-                    TinyCode::ReadI(Opmr::Id(identifier.0))
-                ]
-            },
-            ThreeAddressCode::WriteI {
-                identifier
-            } => TinyCodeSequence {
-                sequence: vec![
-                    TinyCode::WriteI(Opmr::Id(identifier.0))
-                ],
+            ThreeAddressCode::WriteI { identifier } => TinyCodeSequence {
+                sequence: vec![TinyCode::WriteI(Opmr::Id(identifier.0))],
             },
             ThreeAddressCode::AddF {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_float_opmrl();
@@ -383,13 +361,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, add_code]
+                    sequence: vec![move_code, add_code],
                 }
-            },
+            }
             ThreeAddressCode::SubF {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_float_opmrl();
@@ -398,13 +376,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, sub_code]
+                    sequence: vec![move_code, sub_code],
                 }
-            },
+            }
             ThreeAddressCode::MulF {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_float_opmrl();
@@ -413,13 +391,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, mul_code]
+                    sequence: vec![move_code, mul_code],
                 }
             }
             ThreeAddressCode::DivF {
                 lhs,
                 rhs,
-                temp_result: temporary
+                temp_result: temporary,
             } => {
                 let (operand1, move_code) = TinyCode::process_tac_left_operand(lhs);
                 let operand2 = TinyCode::process_tac_right_operand(rhs).into_float_opmrl();
@@ -428,53 +406,41 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, div_code]
+                    sequence: vec![move_code, div_code],
                 }
-            },
-            ThreeAddressCode::StoreF {
-                lhs,
-                rhs,
-            } => {
-                let operand1 =  match lhs {
+            }
+            ThreeAddressCode::StoreF { lhs, rhs } => {
+                let operand1 = match lhs {
                     LValueF::Temp(temp) => {
-                        let maybe_new_register = FLOAT_REGISTER_MAP.borrow()
+                        let maybe_new_register = FLOAT_REGISTER_MAP
+                            .borrow()
                             .get(&temp)
                             .copied()
                             .unwrap_or_else(|| Register::new());
-                        FLOAT_REGISTER_MAP.borrow_mut().insert(temp, maybe_new_register);
+                        FLOAT_REGISTER_MAP
+                            .borrow_mut()
+                            .insert(temp, maybe_new_register);
                         Opmr::Reg(maybe_new_register)
                     }
-                    LValueF::Id(id) => Opmr::Id(id.0)
+                    LValueF::Id(id) => Opmr::Id(id.0),
                 };
                 let operand2 = TinyCode::process_tac_right_operand(rhs);
                 let move_code = TinyCode::Move(operand2, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code]
+                    sequence: vec![move_code],
                 }
+            }
+            ThreeAddressCode::ReadF { identifier } => TinyCodeSequence {
+                sequence: vec![TinyCode::ReadF(Opmr::Id(identifier.0))],
             },
-            ThreeAddressCode::ReadF {
-                identifier
-            } => TinyCodeSequence {
-                sequence: vec![
-                    TinyCode::ReadF(Opmr::Id(identifier.0))
-                ]
+            ThreeAddressCode::WriteF { identifier } => TinyCodeSequence {
+                sequence: vec![TinyCode::WriteF(Opmr::Id(identifier.0))],
             },
-            ThreeAddressCode::WriteF {
-                identifier
-            } => TinyCodeSequence {
-                sequence: vec![
-                    TinyCode::WriteF(Opmr::Id(identifier.0))
-                ],
+            ThreeAddressCode::WriteS { identifier } => TinyCodeSequence {
+                sequence: vec![TinyCode::WriteS(identifier.0)],
             },
-            ThreeAddressCode::WriteS {
-                identifier
-            } => TinyCodeSequence {
-                sequence: vec![
-                    TinyCode::WriteS(identifier.0)
-                ],
-            },
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }
@@ -484,32 +450,24 @@ impl From<Vec<ThreeAddressCode>> for TinyCodeSequence {
         // Add all symbol declarations to tiny code sequence
         let symbol_decls = SymbolTable::seal()
             .into_iter()
-            .map(|symbol| {
-                match symbol {
-                    Symbol::String(decl) => {
-                        let (name, value) = decl.into_parts();
-                        TinyCode::Str(Sid {
-                            id: name,
-                            value,
-                        })
-                    },
-                    Symbol::Int(decl) => {
-                        TinyCode::Var(decl.into_name())
-                    },
-                    Symbol::Float(decl) => {
-                        TinyCode::Var(decl.into_name())
-                    },
+            .map(|symbol| match symbol {
+                Symbol::String(decl) => {
+                    let (name, value) = decl.into_parts();
+                    TinyCode::Str(Sid { id: name, value })
                 }
+                Symbol::Int(decl) => TinyCode::Var(decl.into_name()),
+                Symbol::Float(decl) => TinyCode::Var(decl.into_name()),
             })
             .collect();
 
         let mut result = TinyCodeSequence {
-            sequence: symbol_decls
+            sequence: symbol_decls,
         };
 
-        result.sequence.extend(three_adr_code_seq
-            .into_iter()
-            .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence)
+        result.sequence.extend(
+            three_adr_code_seq
+                .into_iter()
+                .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence),
         );
 
         result.sequence.push(TinyCode::Halt);

@@ -1,23 +1,25 @@
 #![feature(box_into_inner)]
 #![allow(unused_imports)]
-mod symbol_table;
-mod ast;
-mod token;
-mod three_addr_code_ir;
 mod asm;
+mod ast;
+mod symbol_table;
+mod three_addr_code_ir;
+mod token;
 
 #[macro_use]
 extern crate lalrpop_util;
 
+use crate::asm::tiny::TinyCodeSequence;
 use crate::symbol_table::SYMBOL_TABLE;
+use crate::three_addr_code_ir::three_address_code::{
+    visit::ThreeAddressCodeVisitor, ThreeAddressCode,
+};
 use flexi_logger::Logger;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, ErrorKind, Read};
 use std::io;
+use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
-use crate::three_addr_code_ir::three_address_code::{ThreeAddressCode, visit::ThreeAddressCodeVisitor};
-use crate::asm::tiny::TinyCodeSequence;
 
 lalrpop_mod!(pub microc);
 
@@ -28,9 +30,17 @@ fn main() {
         Logger::try_with_env_or_str("Trace")?.start()?;
 
         let args = std::env::args().collect::<Vec<String>>();
-        assert_eq!(args.len(), 3, "Must provide the input and output filenames!");
-        let input_file_name = args.get(1).ok_or(io::Error::from(ErrorKind::InvalidInput))?;
-        let result_file_name = args.get(2).ok_or(io::Error::from(ErrorKind::InvalidInput))?;
+        assert_eq!(
+            args.len(),
+            3,
+            "Must provide the input and output filenames!"
+        );
+        let input_file_name = args
+            .get(1)
+            .ok_or(io::Error::from(ErrorKind::InvalidInput))?;
+        let result_file_name = args
+            .get(2)
+            .ok_or(io::Error::from(ErrorKind::InvalidInput))?;
 
         let mut input_file = BufReader::new(File::open(input_file_name)?);
         let mut buf = String::new();
@@ -41,8 +51,7 @@ fn main() {
         result_file.read_to_string(&mut result)?;
 
         println!("Beginning parsing file: [{}]", input_file_name);
-        let program = microc::ProgramParser::new()
-            .parse(&buf);
+        let program = microc::ProgramParser::new().parse(&buf);
 
         /* STAGE2 result verification */
         // let result = result.trim();
