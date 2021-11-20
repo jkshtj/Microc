@@ -116,13 +116,14 @@ pub enum ThreeAddressCode {
     },
 }
 
+// TODO: Factor out all type checking into its own visitor.
 pub mod visit {
     use crate::ast::ast_node::visit::Visitor;
     use crate::ast::ast_node::{AddOp, Assignment, AstNode, CmpOp, Condition, Expr, MulOp, Stmt};
     use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
-        Jump, Eq, Gt, Gte, Lt, Lte, Ne,
+        Eq, Gt, Gte, Jump, Lt, Lte, Ne,
     };
     use crate::three_addr_code_ir::{
         BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI,
@@ -246,11 +247,47 @@ pub mod visit {
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::For {
-                    init: _,
-                    condition: _,
-                    incr: _,
-                    body: _,
-                } => todo!(),
+                    init,
+                    condition,
+                    incr,
+                    body,
+                } => {
+                    // Generate loop init 3AC
+                    let mut code_sequence = init.map_or(vec![], |assignment| {
+                        self.visit_assignment(assignment).code_sequence
+                    });
+                    let loop_start_label = Label::new();
+                    code_sequence.push(ThreeAddressCode::Label(loop_start_label));
+
+                    // Generate loop condition 3AC
+                    let mut condition = self.visit_condition(condition);
+                    code_sequence.append(&mut condition.code_sequence);
+                    // Unwrapping is safe here as the `jump_to` field
+                    // of the returned `CodeObject`, from visiting a `Condition`
+                    // is guaranteed to be set.
+                    let loop_break_label = condition.jump_to.unwrap();
+
+                    // Generate loop incr 3AC
+                    let loop_incr_label = Label::new();
+                    let mut incr_statements = incr.map_or(vec![], |assignment| {
+                        self.visit_assignment(assignment).code_sequence
+                    });
+
+                    // Add loop statements 3AC
+                    body.into_iter().for_each(|stmt| {
+                        code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                    });
+
+                    // Add loop incr 3AC
+                    code_sequence.push(ThreeAddressCode::Label(loop_incr_label));
+                    code_sequence.append(&mut incr_statements);
+                    code_sequence.push(ThreeAddressCode::Jump(loop_start_label));
+
+                    // loop break-out label
+                    code_sequence.push(ThreeAddressCode::Label(loop_break_label));
+
+                    CodeObject::builder().code_sequence(code_sequence).build()
+                }
             }
         }
 

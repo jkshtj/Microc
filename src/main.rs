@@ -108,7 +108,6 @@ fn main() {
             .collect();
 
         three_addr_codes
-            
             .into_iter()
             .for_each(|code| println!(";{}", code));
         /*******************************/

@@ -453,6 +453,7 @@ mulop: Expr = {
 if_stmt: Stmt = {
     // TODO: What should `decl` return?
     start_if "(" <condition: cond> ")" decl <mut then_block: stmt_list> <mut else_block: else_part> end_if_or_else => {
+        // TODO: ADD a comment for why we need to reverse.
         then_block.reverse();
         else_block.reverse();
 
@@ -520,7 +521,10 @@ incr_stmt: Option<Assignment> = {
 
 for_stmt: Stmt = {
     // TODO: What should `decl` return?
-    start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" decl <body: stmt_list> end_for => {
+    start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" decl <mut body: stmt_list> end_for => {
+        // TODO: Add a comment for why we need to reverse statements.
+        body.reverse();
+
         Stmt::For {
             init,
             condition,
