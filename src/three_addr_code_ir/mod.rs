@@ -22,6 +22,9 @@ impl Label {
     pub fn new() -> Self {
         Self(LABEL_COUNTER.fetch_add(1, Ordering::SeqCst))
     }
+    pub fn label(&self) -> u64 {
+        self.0
+    }
 }
 
 /// 3AC concept to represent int registers.
@@ -114,6 +117,16 @@ pub enum BinaryExprOperand {
     LValueI(LValueI),
     LValueF(LValueF),
     RValue(RValue),
+}
+
+impl BinaryExprOperand {
+    pub fn is_mem_ref(&self) -> bool {
+        match self {
+            BinaryExprOperand::LValueI(LValueI::Id(_)) => true,
+            BinaryExprOperand::LValueF(LValueF::Id(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl From<TempI> for BinaryExprOperand {

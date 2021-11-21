@@ -1,7 +1,7 @@
 use derive_more::Display;
 
 use crate::three_addr_code_ir::{
-    BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, TempF, TempI,
+    BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType, TempF, TempI,
 };
 
 #[derive(Debug, Clone, Display)]
@@ -79,37 +79,73 @@ pub enum ThreeAddressCode {
     #[display(fmt = "JUMP {}", _0)]
     Jump(Label),
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
-    Gt {
+    GtI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
-    Lt {
+    LtI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
-    Gte {
+    GteI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
-    Lte {
+    LteI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
-    Ne {
+    NeI {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
-    Eq {
+    EqI {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
+    GtF {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
+    LtF {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
+    GteF {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
+    LteF {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
+    NeF {
+        lhs: BinaryExprOperand,
+        rhs: BinaryExprOperand,
+        label: Label,
+    },
+    #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
+    EqF {
         lhs: BinaryExprOperand,
         rhs: BinaryExprOperand,
         label: Label,
@@ -123,7 +159,7 @@ pub mod visit {
     use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
-        Eq, Gt, Gte, Jump, Lt, Lte, Ne,
+        EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
     };
     use crate::three_addr_code_ir::{
         BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI,
@@ -240,6 +276,9 @@ pub mod visit {
                     else_block.into_iter().for_each(|stmt| {
                         code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
                     });
+
+                    // Jump to break_label
+                    code_sequence.push(Jump(break_label));
 
                     // if-else block break-out label
                     code_sequence.push(ThreeAddressCode::Label(break_label));
@@ -533,41 +572,97 @@ pub mod visit {
 
             let lhs = self.visit_expression(lhs);
             let rhs = self.visit_expression(rhs);
+            // The result and result_type of a `CodeObject` returned
+            // by an expression should never be `None`. An expression
+            // should always evaluate to a result with a strong type.
+            let (left_result_type, right_result_type) =
+                (lhs.result_type.unwrap(), rhs.result_type.unwrap());
             let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
             let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
+
+            let comparison_type =
+                ThreeAddressCodeVisitor::combined_result_type(left_result_type, right_result_type);
 
             let else_label = Label::new();
 
             let curr_code = match cmp_op {
-                CmpOp::Lt => Gte {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Lt => match comparison_type {
+                    ResultType::Int => GteI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => GteF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
-                CmpOp::Gt => Lte {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Gt => match comparison_type {
+                    ResultType::Int => LteI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => LteF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
-                CmpOp::Eq => Ne {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Eq => match comparison_type {
+                    ResultType::Int => NeI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => NeF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
-                CmpOp::Ne => Eq {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Ne => match comparison_type {
+                    ResultType::Int => EqI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => EqF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
-                CmpOp::Lte => Gt {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Lte => match comparison_type {
+                    ResultType::Int => GtI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => GtF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
-                CmpOp::Gte => Lt {
-                    lhs: curr_left_operand,
-                    rhs: curr_right_operand,
-                    label: else_label,
+                CmpOp::Gte => match comparison_type {
+                    ResultType::Int => LtI {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::Float => LtF {
+                        lhs: curr_left_operand,
+                        rhs: curr_right_operand,
+                        label: else_label,
+                    },
+                    ResultType::String => unreachable!(),
                 },
             };
 
@@ -584,12 +679,14 @@ pub mod visit {
 
 #[cfg(test)]
 mod test {
-    use crate::ast::ast_node::{AddOp, AstNode, Expr, Identifier, MulOp};
+    use crate::ast::ast_node::{AddOp, AstNode, CmpOp, Condition, Expr, Identifier, MulOp};
     use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
     use crate::three_addr_code_ir::ResultType;
 
     use super::*;
+    use crate::ast::ast_node;
+    use crate::ast::ast_node::AstNode::Stmt;
 
     #[test]
     fn convert_simple_int_expression_ast_to_code_object() {
@@ -702,7 +799,31 @@ mod test {
         visitor.walk_ast(ast);
     }
 
-    // TODO: This test should not panic after STAGE4
+    #[test]
+    #[should_panic]
+    fn convert_condition_comapring_string_identifier_panics() {
+        let ast = AstNode::Stmt(ast_node::Stmt::If {
+            condition: Condition {
+                cmp_op: CmpOp::Lt,
+                lhs: Expr::Id(Identifier {
+                    id: "b".to_string(),
+                    sym_type: SymbolType::String,
+                }),
+                rhs: Expr::Id(Identifier {
+                    id: "b".to_string(),
+                    sym_type: SymbolType::Num(NumType::Float),
+                }),
+            },
+            then_block: vec![],
+            else_block: vec![],
+        });
+
+        let mut visitor = ThreeAddressCodeVisitor;
+
+        visitor.walk_ast(ast);
+    }
+
+    // TODO: This test should not panic after STAGE5
     #[test]
     #[should_panic]
     fn convert_math_expression_with_mixed_num_operand_types_panics() {
