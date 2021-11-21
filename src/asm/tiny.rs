@@ -171,11 +171,30 @@ pub enum TinyCode {
 }
 
 impl TinyCode {
+    fn binary_op_tac_operand_to_register_or_move(
+        operand: BinaryExprOperand,
+    ) -> (Register, Option<TinyCode>) {
+        match operand {
+            BinaryExprOperand::LValueI(LValueI::Temp(temp)) => {
+                let register = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
+                (register, None)
+            }
+            BinaryExprOperand::LValueF(LValueF::Temp(temp)) => {
+                let register = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
+                (register, None)
+            }
+            _ => {
+                let (register, move_code) =
+                    TinyCode::move_binary_op_tac_operand_to_register(operand);
+                (register, Some(move_code))
+            }
+        }
+    }
+
     fn move_binary_op_tac_operand_to_register(operand: BinaryExprOperand) -> (Register, TinyCode) {
         match operand {
             BinaryExprOperand::LValueI(lval) => match lval {
                 LValueI::Temp(temp) => {
-                    // TODO: We don't need to return a new register here.
                     let existing_reg = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     let new_reg = Register::new();
                     (
@@ -199,7 +218,6 @@ impl TinyCode {
             },
             BinaryExprOperand::LValueF(lval) => match lval {
                 LValueF::Temp(temp) => {
-                    // TODO: We don't need to return a new register here.
                     let existing_reg = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     let new_reg = Register::new();
                     (
@@ -408,14 +426,20 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 rhs,
                 temp_result: temporary,
             } => {
-                let (operand1, move_code) = TinyCode::move_binary_op_tac_operand_to_register(lhs);
+                // TODO: Do the same for all binary math 3ACs
+                let (operand1, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
                 let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
                 let mul_code = TinyCode::MulF(operand2, operand1);
 
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
 
                 TinyCodeSequence {
-                    sequence: vec![move_code, mul_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(mul_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::DivF {
@@ -484,122 +508,194 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
             },
             ThreeAddressCode::GtI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jgt(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::LtI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jlt(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::GteI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jge(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::LteI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jle(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::NeI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jne(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::EqI { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jeq(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::GtF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jgt(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::LtF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jlt(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::GteF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jge(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::LteF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jle(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::NeF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jne(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
             ThreeAddressCode::EqF { lhs, rhs, label } => {
                 let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
-                let (operand2, move_code) = TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                let (operand2, move_code) =
+                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jeq(label.into());
                 TinyCodeSequence {
-                    sequence: vec![move_code, cmp_code, jump_code],
+                    sequence: {
+                        let mut result = move_code.map_or(vec![], |move_code| vec![move_code]);
+                        result.push(cmp_code);
+                        result.push(jump_code);
+                        result
+                    },
                 }
             }
         }
