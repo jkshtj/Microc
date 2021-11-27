@@ -53,7 +53,7 @@ fn main() {
         println!("Beginning parsing file: [{}]", input_file_name);
         let program = microc::ProgramParser::new().parse(&buf);
 
-        /* STAGE2 result verification */
+        /* STAGE 2 result verification */
         // let result = result.trim();
         // if program.is_ok() && result == "Accepted" ||
         //     program.is_err() && result == "Not accepted" {
@@ -63,7 +63,7 @@ fn main() {
         // }
         /*******************************/
 
-        /* STAGE3 result verification */
+        /* STAGE 3 result verification */
         // let symbol_table = SYMBOL_TABLE.borrow();
         // let mut actual_result = format!("{}", &*symbol_table);
         // actual_result.retain(|x| !x.is_whitespace());
@@ -78,27 +78,7 @@ fn main() {
 
         /*******************************/
 
-        /* STAGE4 result verification */
-        // let mut result = program.unwrap();
-        // let mut visitor = ThreeAddressCodeVisitor;
-        // result.reverse();
-        // let three_addr_codes: Vec<ThreeAddressCode> = result
-        //     .into_iter()
-        //     .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
-        //     .collect();
-        //
-        // // three_addr_codes
-        // //     .clone()
-        // //     .into_iter()
-        // //     .for_each(|code| println!(";{}", code));
-        //
-        // let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        // tiny_code.sequence
-        //     .into_iter()
-        //     .for_each(|code| println!("{}", code));
-        /*******************************/
-
-        /* STAGE5 result verification */
+        /* STAGE 4,5,6 result verification */
         let mut result = program.unwrap();
         let mut visitor = ThreeAddressCodeVisitor;
         result.reverse();
@@ -107,14 +87,13 @@ fn main() {
             .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
             .collect();
 
-        three_addr_codes
-            .clone()
-            .into_iter()
-            .for_each(|code| println!(";{}", code));
+        // three_addr_codes
+        //     .clone()
+        //     .into_iter()
+        //     .for_each(|code| println!(";{}", code));
 
         let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        tiny_code
-            .sequence
+        tiny_code.sequence
             .into_iter()
             .for_each(|code| println!("{}", code));
         /*******************************/
