@@ -273,12 +273,14 @@ pub mod visit {
                     code_sequence.push(ThreeAddressCode::Label(else_label));
 
                     // `else` block statements
-                    else_block.into_iter().for_each(|stmt| {
-                        code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
-                    });
+                    if !else_block.is_empty() {
+                        else_block.into_iter().for_each(|stmt| {
+                            code_sequence.append(&mut self.visit_statement(stmt).code_sequence);
+                        });
 
-                    // Jump to break_label
-                    code_sequence.push(Jump(break_label));
+                        // Jump to break_label
+                        code_sequence.push(Jump(break_label));
+                    }
 
                     // if-else block break-out label
                     code_sequence.push(ThreeAddressCode::Label(break_label));
