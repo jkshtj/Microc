@@ -43,44 +43,6 @@ pub struct Identifier {
     pub sym_type: SymbolType,
 }
 
-/// Statements in Microc.
-#[derive(Debug, Clone)]
-pub enum Stmt {
-    Read(Vec<Identifier>),
-    Write(Vec<Identifier>),
-    Assign(Assignment),
-    If {
-        condition: Condition,
-        then_block: Vec<Stmt>,
-        else_block: Vec<Stmt>,
-    },
-    For {
-        init: Option<Assignment>,
-        condition: Condition,
-        incr: Option<Assignment>,
-        body: Vec<Stmt>,
-    },
-}
-
-/// An assignment, which exists only
-/// for building different statements
-/// made up of assign semantics, such as,
-/// assign, if and for statements.
-#[derive(Debug, Clone)]
-pub struct Assignment {
-    pub lhs: Identifier,
-    pub rhs: Expr,
-}
-
-/// A boolean expression that evaluates
-/// to either true or false.
-#[derive(Debug, Clone)]
-pub struct Condition {
-    pub cmp_op: CmpOp,
-    pub lhs: Expr,
-    pub rhs: Expr,
-}
-
 /// Math expressions in Microc
 /// that evaluate to a numeric
 /// value.
@@ -102,10 +64,73 @@ pub enum Expr {
     None,
 }
 
+/// An assignment, which exists only
+/// for building different statements
+/// made up of assign semantics, such as,
+/// assign, if and for statements.
+#[derive(Debug, Clone)]
+pub struct Assignment {
+    pub lhs: Identifier,
+    pub rhs: Expr,
+}
+
+/// A boolean expression that evaluates
+/// to either true or false.
+#[derive(Debug, Clone)]
+pub struct Condition {
+    pub cmp_op: CmpOp,
+    pub lhs: Expr,
+    pub rhs: Expr,
+}
+
+/// Statements in Microc.
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Read(Vec<Identifier>),
+    Write(Vec<Identifier>),
+    Assign(Assignment),
+    If {
+        condition: Condition,
+        then_block: Vec<Stmt>,
+        else_block: Vec<Stmt>,
+    },
+    For {
+        init: Option<Assignment>,
+        condition: Condition,
+        incr: Option<Assignment>,
+        body: Vec<Stmt>,
+    },
+}
+
+/// Represents possible return types
+/// in a function.
+#[derive(Debug, Clone, Copy)]
+pub enum FunctionReturnType {
+    Int,
+    Float,
+    Void,
+}
+
+/// Represents constructs in Microc
+/// that can be composed from expressions
+/// and statements. Currently, the only
+/// such valid construct in Microc is
+/// functions. But this can change in the
+/// future to support classes/structs/enums etc.
+#[derive(Debug, Clone)]
+pub enum Item {
+    Function {
+        name: String,
+        return_type: FunctionReturnType,
+        body: Vec<Stmt>,
+    },
+}
+
 /// Abstract syntax tree representation
 /// for Microc.
 #[derive(Debug)]
 pub enum AstNode {
+    Item(Item),
     Stmt(Stmt),
     Expr(Expr),
 }
