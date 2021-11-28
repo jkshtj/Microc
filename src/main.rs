@@ -10,7 +10,7 @@ mod token;
 extern crate lalrpop_util;
 
 use crate::asm::tiny::TinyCodeSequence;
-use crate::symbol_table::SYMBOL_TABLE;
+use crate::symbol_table::{SymbolTable, SYMBOL_TABLE};
 use crate::three_addr_code_ir::three_address_code::{
     visit::ThreeAddressCodeVisitor, ThreeAddressCode,
 };
@@ -93,7 +93,8 @@ fn main() {
         //     .for_each(|code| println!(";{}", code));
 
         let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        tiny_code.sequence
+        tiny_code
+            .sequence
             .into_iter()
             .for_each(|code| println!("{}", code));
         /*******************************/

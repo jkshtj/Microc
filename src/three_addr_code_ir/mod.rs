@@ -194,7 +194,9 @@ pub enum ResultType {
 impl From<SymbolType> for ResultType {
     fn from(symbol_type: SymbolType) -> Self {
         match symbol_type {
-            SymbolType::String => panic!("STRING type is not a valid result of any 3AC operations."),
+            SymbolType::String => {
+                panic!("STRING type is not a valid result of any 3AC operations.")
+            }
             SymbolType::Num(t) => match t {
                 NumType::Int => ResultType::Int,
                 NumType::Float => ResultType::Float,

@@ -1,5 +1,6 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, FunctionReturnType, Item};
 use crate::symbol_table::{SymbolTable, NumType};
+use crate::symbol_table;
 use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
 use std::str::FromStr;
@@ -88,7 +89,7 @@ string_decl: () = {
         SymbolTable::add_symbol(StringDecl::new(
             id.to_owned(),
             val.to_owned()
-        )).or_else(|decl_err| {
+        ), false).or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
                 error: "Encountered declaration error!",
@@ -101,8 +102,8 @@ var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned())),
-                NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned())),
+                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned()), false),
+                NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned()), false),
             }.or_else(|decl_err| {
                 SymbolTable::set_decl_error(decl_err);
                 Err(ParseError::User {
@@ -118,9 +119,12 @@ var_type: NumType = {
     INT => NumType::Int,
 };
 
-any_type: () = {
-    var_type,
-    VOID,
+any_type: FunctionReturnType = {
+    <var_type> => match <> {
+        NumType::Float => FunctionReturnType::Float,
+        NumType::Int => FunctionReturnType::Int,
+    },
+    VOID => FunctionReturnType::Void,
 };
 
 id_list: Vec<&'input str> = {
@@ -141,8 +145,8 @@ param_decl_list: () = {
 param_decl: () = {
     <ty:var_type> <id:IDENTIFIER> =>? {
         match ty {
-            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned())),
-            NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned())),
+            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned()), true),
+            NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned()), true),
         }.or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
@@ -165,31 +169,40 @@ param_decl_tail: () = {
 //  functions. It doesn't matter cause there will only
 // be one function in stage 4.
 func_declarations: Vec<AstNode> = {
-    <mut func_decl: func_decl> <mut func_declarations: func_declarations> => {
-        func_declarations.append(&mut func_decl);
+    <func_decl: func_decl> <mut func_declarations: func_declarations> => {
+        func_declarations.push(func_decl);
         func_declarations
     },
     empty => vec![],
 };
 
-func_decl: Vec<AstNode> = {
-    start_func "("param_decl_list")" BEGIN <func_body> end_func => {
-        <>
-        .into_iter()
-        .map(|stmt| AstNode::Stmt(stmt))
-        .collect()
+func_decl: AstNode = {
+    <metadata: start_func> "("param_decl_list")" BEGIN <body: func_body> end_func => {
+        AstNode::Item(Item::Function {
+            return_type: metadata.0,
+            name: metadata.1,
+            body,
+        })
     },
 };
 
-start_func: () = {
-    FUNCTION any_type <id:IDENTIFIER> => {
-        SymbolTable::add_scope(id);
+start_func: (FunctionReturnType, String) = {
+    FUNCTION <return_type: any_type> <id:IDENTIFIER> => {
+        SymbolTable::add_function_scope(id);
+        // TODO: init value for local slot map may need to change
+        //  depending on how we store registers.
+        symbol_table::init_stack_frame_local_slot_counter(0);
+        symbol_table::init_stack_frame_param_slot_counter(0);
+
+        (return_type, id.to_owned())
     },
 };
 
 end_func: () = {
     END => {
         SymbolTable::end_curr_scope();
+        symbol_table::reset_stack_frame_local_slot_counter();
+        symbol_table::reset_stack_frame_param_slot_counter();
     },
 };
 
