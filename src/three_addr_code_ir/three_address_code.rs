@@ -195,6 +195,7 @@ pub mod visit {
             match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
                 AstNode::Expr(expr) => self.visit_expression(expr),
+                _ => todo!(),
             }
         }
     }
@@ -338,7 +339,6 @@ pub mod visit {
                     let result_type = identifier.sym_type.into();
 
                     let result: BinaryExprOperand = match result_type {
-                        ResultType::String => panic!("Invalid operation: String identifier cannot be a part of a Math expression!"),
                         ResultType::Int => IdentI(identifier.id).into(),
                         ResultType::Float => IdentF(identifier.id).into(),
                     };
@@ -390,7 +390,6 @@ pub mod visit {
 
                     let (curr_code, result_register) = match op {
                         AddOp::Add => match result_type {
-                            ResultType::String => unreachable!(),
                             ResultType::Int => {
                                 let temp_result = TempI::new();
                                 (
@@ -415,7 +414,6 @@ pub mod visit {
                             }
                         },
                         AddOp::Sub => match result_type {
-                            ResultType::String => unreachable!(),
                             ResultType::Int => {
                                 let temp_result = TempI::new();
                                 (
@@ -468,7 +466,6 @@ pub mod visit {
 
                     let (curr_code, result_register) = match op {
                         MulOp::Mul => match result_type {
-                            ResultType::String => unreachable!(),
                             ResultType::Int => {
                                 let temp_result = TempI::new();
                                 (
@@ -493,7 +490,6 @@ pub mod visit {
                             }
                         },
                         MulOp::Div => match result_type {
-                            ResultType::String => unreachable!(),
                             ResultType::Int => {
                                 let temp_result = TempI::new();
                                 (
@@ -599,7 +595,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
                 CmpOp::Gt => match comparison_type {
                     ResultType::Int => LteI {
@@ -612,7 +607,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
                 CmpOp::Eq => match comparison_type {
                     ResultType::Int => NeI {
@@ -625,7 +619,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
                 CmpOp::Ne => match comparison_type {
                     ResultType::Int => EqI {
@@ -638,7 +631,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
                 CmpOp::Lte => match comparison_type {
                     ResultType::Int => GtI {
@@ -651,7 +643,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
                 CmpOp::Gte => match comparison_type {
                     ResultType::Int => LtI {
@@ -664,7 +655,6 @@ pub mod visit {
                         rhs: curr_right_operand,
                         label: else_label,
                     },
-                    ResultType::String => unreachable!(),
                 },
             };
 

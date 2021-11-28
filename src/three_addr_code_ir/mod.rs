@@ -187,7 +187,6 @@ impl From<RValue> for BinaryExprOperand {
 //  use case outside of 3AC.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ResultType {
-    String,
     Int,
     Float,
 }
@@ -195,7 +194,7 @@ pub enum ResultType {
 impl From<SymbolType> for ResultType {
     fn from(symbol_type: SymbolType) -> Self {
         match symbol_type {
-            SymbolType::String => ResultType::String,
+            SymbolType::String => panic!("STRING type is not a valid result of any 3AC operations."),
             SymbolType::Num(t) => match t {
                 NumType::Int => ResultType::Int,
                 NumType::Float => ResultType::Float,
