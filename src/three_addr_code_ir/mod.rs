@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use derive_more::Display;
 
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::{NumType, SymbolType};
-
+use crate::symbol_table::symbol::data::DataType;
+use crate::symbol_table::symbol::NumType;
 pub mod three_address_code;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -191,13 +191,13 @@ pub enum ResultType {
     Float,
 }
 
-impl From<SymbolType> for ResultType {
-    fn from(symbol_type: SymbolType) -> Self {
+impl From<DataType> for ResultType {
+    fn from(symbol_type: DataType) -> Self {
         match symbol_type {
-            SymbolType::String => {
+            DataType::String => {
                 panic!("STRING type is not a valid result of any 3AC operations.")
             }
-            SymbolType::Num(t) => match t {
+            DataType::Num(t) => match t {
                 NumType::Int => ResultType::Int,
                 NumType::Float => ResultType::Float,
             },

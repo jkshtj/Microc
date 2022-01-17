@@ -1,15 +1,14 @@
 #![allow(unused)]
 
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Display, Formatter};
-
+use crate::symbol_table::symbol::data::{DataSymbol, DataType};
+use crate::symbol_table::symbol::function::FunctionSymbol;
+use crate::symbol_table::symbol::NumType;
 use atomic_refcell::AtomicRefCell;
 use getset::Getters;
-
-use crate::symbol_table::decl::{FloatDecl, IntDecl, StringDecl};
+use linked_hash_set::LinkedHashSet;
+use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
-
-pub mod decl;
 
 // NOTE - This global, static symbol table requires
 // and assumes the compiler to be single threaded.
@@ -75,14 +74,14 @@ impl SymbolTable {
     // consuming the symbol table?
     /// Seals the symbol table and
     /// returns the current symbols.
-    pub fn seal() -> Vec<Symbol> {
+    pub fn seal() -> Vec<DataSymbol> {
         let mut symbol_table = SYMBOL_TABLE.borrow_mut();
         if let SymbolTable::Active(ref mut scope_tree) = *symbol_table {
             let scopes = std::mem::take(&mut scope_tree.scopes);
             *symbol_table = SymbolTable::Sealed;
             scopes
                 .into_iter()
-                .flat_map(|scope| scope.into_symbols())
+                .flat_map(|scope| scope.into_data_symbols())
                 .collect()
         } else {
             panic!("Symbol table has been sealed.");
@@ -106,7 +105,7 @@ impl SymbolTable {
                 ANONYMOUS_SCOPE_COUNTER.fetch_add(1, Ordering::SeqCst)
             );
             let new_scope = Scope::new_anonymous(anonymous_scope_name, Some(active_scope_id));
-            scope_tree.scopes.push(new_scope);
+            scope_tree.add_new_scope(new_scope);
 
             let new_scope_id = scope_tree.scopes.len() - 1;
             scope_tree.active_scope_stack.push(new_scope_id);
@@ -120,7 +119,7 @@ impl SymbolTable {
             let active_scope_id = scope_tree.active_scope_id();
 
             let new_scope = Scope::new_function(name, Some(active_scope_id));
-            scope_tree.scopes.push(new_scope);
+            scope_tree.add_new_scope(new_scope);
 
             let new_scope_id = scope_tree.scopes.len() - 1;
             scope_tree.active_scope_stack.push(new_scope_id);
@@ -137,13 +136,24 @@ impl SymbolTable {
         }
     }
 
-    pub fn add_symbol<T: Into<Symbol> + Debug>(
-        symbol: T,
+    pub fn add_data_symbol(
+        symbol: DataSymbol,
         is_func_param: bool,
     ) -> Result<(), DeclarationError> {
         if let SymbolTable::Active(ref mut scope_tree) = *SYMBOL_TABLE.borrow_mut() {
             let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_symbol(symbol.into(), is_func_param)?;
+            active_scope.add_data_symbol(symbol, is_func_param)?;
+        } else {
+            panic!("Symbol table has been sealed.");
+        }
+
+        Ok(())
+    }
+
+    pub fn add_function_symbol(symbol: FunctionSymbol) -> Result<(), DeclarationError> {
+        if let SymbolTable::Active(ref mut scope_tree) = *SYMBOL_TABLE.borrow_mut() {
+            let active_scope = scope_tree.active_scope_mut();
+            active_scope.add_function_symbol(symbol)?;
         } else {
             panic!("Symbol table has been sealed.");
         }
@@ -152,13 +162,13 @@ impl SymbolTable {
     }
 
     // TODO: Should this return a `Result`?
-    pub fn symbol_type_for(symbol_name: &str) -> Option<SymbolType> {
+    pub fn symbol_type_for(symbol_name: &str) -> Option<DataType> {
         if let SymbolTable::Active(ref scope_tree) = *SYMBOL_TABLE.borrow() {
             let global_scope = scope_tree.global_scope();
 
-            global_scope.symbol_type(symbol_name).or_else(|| {
+            global_scope.data_symbol_type(symbol_name).or_else(|| {
                 let active_scope = scope_tree.active_scope();
-                active_scope.symbol_type(symbol_name)
+                active_scope.data_symbol_type(symbol_name)
             })
         } else {
             panic!("Symbol table has been sealed.");
@@ -203,10 +213,10 @@ impl SymbolTable {
     }
 
     #[cfg(test)]
-    fn is_symbol_under(scope_id: usize, symbol: &Symbol) -> bool {
+    fn is_symbol_under(scope_id: usize, symbol: &DataSymbol) -> bool {
         if let SymbolTable::Active(ref scope_tree) = *SYMBOL_TABLE.borrow() {
             let scope = scope_tree.scopes.get(scope_id).unwrap();
-            scope.symbols().contains(symbol)
+            scope.data_symbols().contains(symbol)
         } else {
             panic!("Symbol table has been sealed.");
         }
@@ -218,6 +228,17 @@ impl SymbolTable {
             let active_scope_id = *scope_tree.active_scope_stack.last().unwrap();
             let curr_scope = scope_tree.scopes.get(active_scope_id).unwrap();
             curr_scope.name() == name
+        } else {
+            panic!("Symbol table has been sealed.");
+        }
+    }
+
+    #[cfg(test)]
+    fn active_scope_name() -> String {
+        if let SymbolTable::Active(ref scope_tree) = *SYMBOL_TABLE.borrow() {
+            let active_scope_id = *scope_tree.active_scope_stack.last().unwrap();
+            let curr_scope = scope_tree.scopes.get(active_scope_id).unwrap();
+            curr_scope.name().to_owned()
         } else {
             panic!("Symbol table has been sealed.");
         }
@@ -257,76 +278,72 @@ impl ScopeTree {
     }
 
     fn global_scope(&self) -> &Scope {
-        // Unwrapping here should be safe as we never initialize a
-        // symbol table without a global scope.
-        self.scopes.first().unwrap()
+        // Indexing is safe as we never initialize a
+        // ScopeTree without a global scope.
+        &self.scopes[0]
     }
 
     fn global_scope_mut(&mut self) -> &mut Scope {
-        // Unwrapping here should be safe as we never initialize a
-        // symbol table without a global scope.
-        self.scopes.first_mut().unwrap()
+        // Indexing is safe as we never initialize a
+        // ScopeTree without a global scope.
+        &mut self.scopes[0]
     }
 
     fn active_scope(&self) -> &Scope {
-        // Unwrapping here should be safe as we never create a
-        // SymbolTable without setting an active scope.
-        let active_scope_id = *self.active_scope_stack.last().unwrap();
+        // Indexing is safe as we never initialize a
+        // ScopeTree without an active scope.
+        let active_scope_id = self.active_scope_stack[self.active_scope_stack.len() - 1];
 
-        // Unwrapping here should be safe as we always insert a
+        // Indexing is safe as we always insert a
         // scope into the scope tree before inserting its id
         // into the active scope stack.
-        self.scopes.get(active_scope_id).unwrap()
+        &self.scopes[active_scope_id]
     }
 
     fn active_scope_mut(&mut self) -> &mut Scope {
-        // Unwrapping here should be safe as we never create a
-        // SymbolTable without setting an active scope.
-        let active_scope_id = *self.active_scope_stack.last().unwrap();
+        // Indexing is safe as we never initialize a
+        // ScopeTree without an active scope.
+        let active_scope_id = self.active_scope_stack[self.active_scope_stack.len() - 1];
 
-        // Unwrapping here should be safe as we always insert a
+        // Indexing is safe as we always insert a
         // scope into the scope tree before inserting its id
         // into the active scope stack.
-        self.scopes.get_mut(active_scope_id).unwrap()
+        &mut self.scopes[active_scope_id]
     }
 
     fn active_scope_id(&self) -> usize {
-        // Unwrapping here should be safe as we never create a
-        // SymbolTable without setting an active scope.
-        *self.active_scope_stack.last().unwrap()
+        // Indexing is safe as we never initialize a
+        // ScopeTree without an active scope.
+        self.active_scope_stack[self.active_scope_stack.len() - 1]
     }
-}
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum NumType {
-    Int,
-    Float,
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum SymbolType {
-    String,
-    Num(NumType),
+    fn add_new_scope(&mut self, scope: Scope) {
+        self.scopes.push(scope);
+    }
 }
 
 #[derive(Debug)]
 enum Scope {
     Global {
-        symbols: Vec<Symbol>,
-        symbol_set: HashSet<String>,
+        data_symbols: LinkedHashSet<DataSymbol>,
+        function_symbols: LinkedHashSet<FunctionSymbol>,
     },
     Anonymous {
         name: String,
         parent_id: Option<usize>,
-        symbols: Vec<Symbol>,
-        symbol_set: HashSet<String>,
+        data_symbols: LinkedHashSet<DataSymbol>,
     },
     Function {
         name: String,
         parent_id: Option<usize>,
-        symbols: Vec<Symbol>,
-        symbol_set: HashSet<String>,
+        data_symbols: LinkedHashSet<DataSymbol>,
+        // Local variables have negative offsets
+        // from the frame pointer and are therefore
+        // signed integers.
         stack_frame_local_slot_map: HashMap<String, i32>,
+        //  Global variables have positive offsets from
+        // the frame pointer and are therefore unsigned
+        // integers.
         stack_frame_param_slot_map: HashMap<String, u32>,
     },
 }
@@ -334,15 +351,20 @@ enum Scope {
 impl Display for Scope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Scope::Global { symbols, .. } => {
+            Scope::Global { data_symbols, .. } => {
                 writeln!(f, "Symbol table GLOBAL")?;
-                self.symbols()
+                data_symbols
                     .iter()
                     .try_for_each(|symbol| writeln!(f, "{}", symbol))?;
             }
-            Scope::Anonymous { name, symbols, .. } | Scope::Function { name, symbols, .. } => {
+            Scope::Anonymous {
+                name, data_symbols, ..
+            }
+            | Scope::Function {
+                name, data_symbols, ..
+            } => {
                 writeln!(f, "Symbol table {}", self.name())?;
-                self.symbols()
+                data_symbols
                     .iter()
                     .try_for_each(|symbol| writeln!(f, "{}", symbol))?;
             }
@@ -354,8 +376,8 @@ impl Display for Scope {
 impl Scope {
     fn new_global() -> Self {
         Self::Global {
-            symbols: vec![],
-            symbol_set: HashSet::new(),
+            data_symbols: LinkedHashSet::new(),
+            function_symbols: LinkedHashSet::new(),
         }
     }
 
@@ -363,8 +385,7 @@ impl Scope {
         Self::Anonymous {
             name: name.to_string(),
             parent_id,
-            symbols: vec![],
-            symbol_set: HashSet::new(),
+            data_symbols: LinkedHashSet::new(),
         }
     }
 
@@ -372,74 +393,83 @@ impl Scope {
         Self::Function {
             name: name.to_string(),
             parent_id,
-            symbols: vec![],
-            symbol_set: HashSet::new(),
+            data_symbols: LinkedHashSet::new(),
             stack_frame_local_slot_map: HashMap::new(),
             stack_frame_param_slot_map: HashMap::new(),
         }
     }
 
-    fn add_symbol(&mut self, symbol: Symbol, is_func_param: bool) -> Result<(), DeclarationError> {
-        let symbol_name = symbol.get_name();
-        if self.contains_symbol(symbol_name) {
+    fn add_function_symbol(&mut self, symbol: FunctionSymbol) -> Result<(), DeclarationError> {
+        if self.contains_function_symbol(&symbol) {
             return Err(DeclarationError::new(
                 self.name().to_owned(),
-                symbol_name.to_owned(),
+                symbol.name().to_owned(),
             ));
         }
 
         match self {
             Scope::Global {
-                symbols,
-                symbol_set,
-                ..
-            }
-            | Scope::Anonymous {
-                symbols,
-                symbol_set,
-                ..
-            } => {
-                symbol_set.insert(symbol_name.to_owned());
-                symbols.push(symbol);
+                function_symbols, ..
+            } => function_symbols.insert(symbol),
+            // TODO: Better error here.
+            _ => panic!("Cannot add function symbol to a non-global scope!"),
+        };
+
+        Ok(())
+    }
+
+    fn add_data_symbol(
+        &mut self,
+        symbol: DataSymbol,
+        is_func_param: bool,
+    ) -> Result<(), DeclarationError> {
+        if self.contains_data_symbol(&symbol) {
+            return Err(DeclarationError::new(
+                self.name().to_owned(),
+                symbol.name().to_owned(),
+            ));
+        }
+
+        match self {
+            Scope::Global { data_symbols, .. } | Scope::Anonymous { data_symbols, .. } => {
+                data_symbols.insert(symbol);
             }
             Scope::Function {
-                symbols,
-                symbol_set,
+                data_symbols,
                 stack_frame_local_slot_map,
                 stack_frame_param_slot_map,
                 ..
             } => {
-                symbol_set.insert(symbol_name.to_owned());
                 if is_func_param {
                     stack_frame_param_slot_map.insert(
-                        symbol_name.to_owned(),
+                        symbol.name().to_owned(),
                         STACK_FRAME_PARAM_SLOT_COUNTER.fetch_add(1, Ordering::SeqCst),
                     );
                 } else {
                     stack_frame_local_slot_map.insert(
-                        symbol_name.to_owned(),
+                        symbol.name().to_owned(),
                         STACK_FRAME_LOCAL_SLOT_COUNTER.fetch_sub(1, Ordering::SeqCst),
                     );
                 }
-                symbols.push(symbol);
+                data_symbols.insert(symbol);
             }
         };
         Ok(())
     }
 
-    fn symbols(&self) -> &Vec<Symbol> {
+    fn data_symbols(&self) -> &LinkedHashSet<DataSymbol> {
         match self {
-            Scope::Global { symbols, .. }
-            | Scope::Anonymous { symbols, .. }
-            | Scope::Function { symbols, .. } => symbols,
+            Scope::Global { data_symbols, .. }
+            | Scope::Anonymous { data_symbols, .. }
+            | Scope::Function { data_symbols, .. } => data_symbols,
         }
     }
 
-    fn into_symbols(self) -> Vec<Symbol> {
+    fn into_data_symbols(self) -> Vec<DataSymbol> {
         match self {
-            Scope::Global { symbols, .. }
-            | Scope::Anonymous { symbols, .. }
-            | Scope::Function { symbols, .. } => symbols,
+            Scope::Global { data_symbols, .. }
+            | Scope::Anonymous { data_symbols, .. }
+            | Scope::Function { data_symbols, .. } => data_symbols.into_iter().collect(),
         }
     }
 
@@ -450,27 +480,36 @@ impl Scope {
         }
     }
 
-    // TODO: Should this return a `Result`?
-    fn symbol_type(&self, symbol_name: &str) -> Option<SymbolType> {
+    fn contains_data_symbol(&self, symbol: &DataSymbol) -> bool {
         match self {
-            Scope::Global { symbols, .. }
-            | Scope::Anonymous { symbols, .. }
-            | Scope::Function { symbols, .. } => symbols
-                .iter()
-                .find(|&symbol| symbol.get_name() == symbol_name)
-                .map(|symbol| match symbol {
-                    Symbol::String(_) => SymbolType::String,
-                    Symbol::Int(_) => SymbolType::Num(NumType::Int),
-                    Symbol::Float(_) => SymbolType::Num(NumType::Float),
-                }),
+            Scope::Global { data_symbols, .. }
+            | Scope::Anonymous { data_symbols, .. }
+            | Scope::Function { data_symbols, .. } => data_symbols.contains(symbol),
         }
     }
 
-    fn contains_symbol(&self, symbol_name: &str) -> bool {
+    fn contains_function_symbol(&self, symbol: &FunctionSymbol) -> bool {
         match self {
-            Scope::Global { symbol_set, .. }
-            | Scope::Anonymous { symbol_set, .. }
-            | Scope::Function { symbol_set, .. } => symbol_set.contains(symbol_name),
+            Scope::Global {
+                function_symbols, ..
+            } => function_symbols.contains(symbol),
+            _ => false,
+        }
+    }
+
+    // TODO: Should this return a `Result`?
+    fn data_symbol_type(&self, symbol_name: &str) -> Option<DataType> {
+        match self {
+            Scope::Global { data_symbols, .. }
+            | Scope::Anonymous { data_symbols, .. }
+            | Scope::Function { data_symbols, .. } => data_symbols
+                .iter()
+                .find(|&symbol| symbol.name() == symbol_name)
+                .map(|symbol| match symbol {
+                    DataSymbol::String { .. } => DataType::String,
+                    DataSymbol::Int { .. } => DataType::Num(NumType::Int),
+                    DataSymbol::Float { .. } => DataType::Num(NumType::Float),
+                }),
         }
     }
 
@@ -485,43 +524,89 @@ impl Scope {
     }
 }
 
-/// Represents a string, int or a float
-/// symbol declared in the program.
-#[derive(Debug, PartialEq, Clone, derive_more::Display)]
-pub enum Symbol {
-    #[display(fmt = "{}", _0)]
-    String(StringDecl),
-    #[display(fmt = "{}", _0)]
-    Int(IntDecl),
-    #[display(fmt = "{}", _0)]
-    Float(FloatDecl),
-}
+pub mod symbol {
+    #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+    pub enum NumType {
+        Int,
+        Float,
+    }
 
-impl Symbol {
-    pub fn get_name(&self) -> &str {
-        match self {
-            Symbol::String(decl) => decl.get_name(),
-            Symbol::Int(decl) => decl.get_name(),
-            Symbol::Float(decl) => decl.get_name(),
+    pub mod data {
+        use crate::symbol_table::symbol::NumType;
+
+        #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+        pub enum DataType {
+            String,
+            Num(NumType),
+        }
+
+        /// Represents a symbol declared in
+        /// the program to represent data -
+        /// string, int or a float.
+        #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
+        pub enum DataSymbol {
+            #[display(fmt = "name {} type STRING value {}\n", name, value)]
+            String { name: String, value: String },
+            #[display(fmt = "name {} type INT\n", name)]
+            Int { name: String },
+            #[display(fmt = "name {} type FLOAT\n", name)]
+            Float { name: String },
+        }
+
+        impl DataSymbol {
+            pub fn name(&self) -> &str {
+                match self {
+                    DataSymbol::String { name, value } => name,
+                    DataSymbol::Int { name } => name,
+                    DataSymbol::Float { name } => name,
+                }
+            }
+        }
+    }
+
+    pub mod function {
+        use crate::symbol_table::symbol::NumType;
+
+        /// Represents possible return types
+        /// in a function.
+        #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+        pub enum ReturnType {
+            Num(NumType),
+            Void,
+        }
+
+        /// Represents function or non-data
+        /// symbols in the program.
+        #[derive(Debug, PartialEq, Clone, Hash, Eq)]
+        pub struct FunctionSymbol {
+            name: String,
+            return_type: ReturnType,
+            param_list: Vec<NumType>,
+        }
+
+        impl FunctionSymbol {
+            pub fn name(&self) -> &str {
+                &self.name
+            }
         }
     }
 }
 
+// TODO: Add tests for function symbols
 #[cfg(test)]
 mod test {
     // Symbol table does not support
     // concurrent modification.
-    use serial_test::serial;
-
-    use crate::symbol_table::SymbolType;
-    use crate::token::{Token, TokenType};
-
     use super::*;
+    use crate::symbol_table::symbol::data::DataType;
+    use crate::token::{Token, TokenType};
+    use serial_test::serial;
 
     fn setup() {
         let mut symbol_table = SYMBOL_TABLE.borrow_mut();
         if let SymbolTable::Active(ref mut scope_tree) = *symbol_table {
             *scope_tree = ScopeTree::new();
+            ANONYMOUS_SCOPE_COUNTER.store(1, Ordering::SeqCst);
         } else {
             *symbol_table = SymbolTable::Active(ScopeTree::new());
         }
@@ -583,25 +668,25 @@ mod test {
     fn add_symbol_works() {
         setup();
 
-        let symbol_under_global = Symbol::String(StringDecl::new(
-            "global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
+        let symbol_under_global = DataSymbol::String {
+            name: "global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
 
         // Should be added under "GLOBAL" scope
-        SymbolTable::add_symbol(symbol_under_global.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_global.clone(), false);
         assert!(SymbolTable::is_symbol_under(0, &symbol_under_global));
 
         SymbolTable::add_function_scope("ChildOfGlobal");
         assert_eq!(2, SymbolTable::num_scopes());
 
-        let symbol_under_child_of_global = Symbol::String(StringDecl::new(
-            "child_of_global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
+        let symbol_under_child_of_global = DataSymbol::String {
+            name: "child_of_global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
 
         // Should be added under "ChildOfGlobal" scope
-        SymbolTable::add_symbol(symbol_under_child_of_global.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_child_of_global.clone(), false);
         assert!(SymbolTable::is_symbol_under(
             1,
             &symbol_under_child_of_global
@@ -613,25 +698,25 @@ mod test {
     fn symbol_type_works() {
         setup();
 
-        let symbol_under_global = Symbol::String(StringDecl::new(
-            "global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
-        SymbolTable::add_symbol(symbol_under_global, false);
+        let symbol_under_global = DataSymbol::String {
+            name: "global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
+        SymbolTable::add_data_symbol(symbol_under_global, false);
         assert_eq!(
-            SymbolType::String,
+            DataType::String,
             SymbolTable::symbol_type_for("global_symbol").unwrap()
         );
         assert!(SymbolTable::symbol_type_for("non_existent").is_none());
 
         SymbolTable::add_function_scope("ChildOfGlobal");
-        let symbol_under_child_of_global = Symbol::String(StringDecl::new(
-            "child_of_global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
-        SymbolTable::add_symbol(symbol_under_child_of_global, false);
+        let symbol_under_child_of_global = DataSymbol::String {
+            name: "child_of_global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
+        SymbolTable::add_data_symbol(symbol_under_child_of_global, false);
         assert_eq!(
-            SymbolType::String,
+            DataType::String,
             SymbolTable::symbol_type_for("child_of_global_symbol").unwrap()
         );
         assert!(SymbolTable::symbol_type_for("non_existent").is_none());
@@ -642,27 +727,25 @@ mod test {
     #[should_panic]
     fn symbol_table_access_after_sealing_results_in_panic() {
         setup();
-        let symbol = Symbol::String(StringDecl::new(
-            "global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
-        SymbolTable::add_symbol(symbol, false);
-        assert!(SymbolTable::symbol_type_for("global_symbol").is_some());
-
+        let symbol = DataSymbol::String {
+            name: "global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
+        SymbolTable::add_data_symbol(symbol.clone(), false);
         SymbolTable::seal();
-        SymbolTable::symbol_type_for("global_symbol");
+        SymbolTable::add_data_symbol(symbol, false);
     }
 
     #[test]
     #[serial]
     fn adding_conflicting_symbols_in_same_scope_results_in_decl_error() {
         setup();
-        let symbol = Symbol::String(StringDecl::new(
-            "global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
-        SymbolTable::add_symbol(symbol.clone(), false);
-        assert!(SymbolTable::add_symbol(symbol, false).err().is_some());
+        let symbol = DataSymbol::String {
+            name: "global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
+        SymbolTable::add_data_symbol(symbol.clone(), false);
+        assert!(SymbolTable::add_data_symbol(symbol, false).err().is_some());
     }
 
     #[test]
@@ -670,25 +753,25 @@ mod test {
     fn symbol_table_to_list_of_symbols() {
         setup();
 
-        let symbol_under_global = Symbol::String(StringDecl::new(
-            "global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
-        SymbolTable::add_symbol(symbol_under_global.clone(), false);
+        let symbol_under_global = DataSymbol::String {
+            name: "global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
+        SymbolTable::add_data_symbol(symbol_under_global.clone(), false);
 
-        let symbol_under_anonymous_scope = Symbol::String(StringDecl::new(
-            "anonymous_scope_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
+        let symbol_under_anonymous_scope = DataSymbol::String {
+            name: "anonymous_scope_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
         SymbolTable::add_anonymous_scope();
-        SymbolTable::add_symbol(symbol_under_anonymous_scope.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_anonymous_scope.clone(), false);
 
-        let symbol_under_child_of_global = Symbol::String(StringDecl::new(
-            "child_of_global_symbol".to_owned(),
-            "value1".to_owned(),
-        ));
+        let symbol_under_child_of_global = DataSymbol::String {
+            name: "child_of_global_symbol".to_owned(),
+            value: "value1".to_owned(),
+        };
         SymbolTable::add_function_scope("ChildOfGlobal");
-        SymbolTable::add_symbol(symbol_under_child_of_global.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_child_of_global.clone(), false);
 
         let symbols = SymbolTable::seal();
         assert_eq!(3, symbols.len());

@@ -5,7 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atomic_refcell::AtomicRefCell;
 use derive_more::Display;
 
-use crate::symbol_table::{Symbol, SymbolTable};
+use crate::symbol_table::symbol::data::DataSymbol;
+use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
@@ -742,12 +743,9 @@ impl From<Vec<ThreeAddressCode>> for TinyCodeSequence {
         let symbol_decls = SymbolTable::seal()
             .into_iter()
             .map(|symbol| match symbol {
-                Symbol::String(decl) => {
-                    let (name, value) = decl.into_parts();
-                    TinyCode::Str(Sid { id: name, value })
-                }
-                Symbol::Int(decl) => TinyCode::Var(decl.into_name()),
-                Symbol::Float(decl) => TinyCode::Var(decl.into_name()),
+                DataSymbol::String { name, value } => TinyCode::Str(Sid { id: name, value }),
+                DataSymbol::Int { name } => TinyCode::Var(name),
+                DataSymbol::Float { name } => TinyCode::Var(name),
             })
             .collect();
 

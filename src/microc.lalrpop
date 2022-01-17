@@ -1,7 +1,8 @@
 use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, FunctionReturnType, Item};
-use crate::symbol_table::{SymbolTable, NumType};
+use crate::symbol_table::SymbolTable;
+use crate::symbol_table::symbol::NumType;
+use crate::symbol_table::symbol::{data::DataSymbol, function::FunctionSymbol};
 use crate::symbol_table;
-use crate::symbol_table::decl::{StringDecl, IntDecl, FloatDecl};
 use lalrpop_util::ParseError;
 use std::str::FromStr;
 
@@ -86,10 +87,10 @@ decl: () = {
 
 string_decl: () = {
     STRING <id:IDENTIFIER> ":=" <val:STRINGLITERAL> ";" =>? {
-        SymbolTable::add_symbol(StringDecl::new(
-            id.to_owned(),
-            val.to_owned()
-        ), false).or_else(|decl_err| {
+        SymbolTable::add_data_symbol(DataSymbol::String {
+            name: id.to_owned(),
+            value: val.to_owned()
+        }, false).or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
                 error: "Encountered declaration error!",
@@ -102,8 +103,8 @@ var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned()), false),
-                NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned()), false),
+                NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, false),
+                NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, false),
             }.or_else(|decl_err| {
                 SymbolTable::set_decl_error(decl_err);
                 Err(ParseError::User {
@@ -145,8 +146,8 @@ param_decl_list: () = {
 param_decl: () = {
     <ty:var_type> <id:IDENTIFIER> =>? {
         match ty {
-            NumType::Float => SymbolTable::add_symbol(FloatDecl::new(id.to_owned()), true),
-            NumType::Int => SymbolTable::add_symbol(IntDecl::new(id.to_owned()), true),
+            NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, true),
+            NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, true),
         }.or_else(|decl_err| {
             SymbolTable::set_decl_error(decl_err);
             Err(ParseError::User {
@@ -242,7 +243,7 @@ assign_expr: Assignment = {
     <id: IDENTIFIER> ":=" <expr: expr> => {
         let lhs = Identifier {
             id: id.to_string(),
-            sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+            data_type: SymbolTable::symbol_type_for(id).unwrap(),
         };
 
         Assignment {
@@ -259,7 +260,7 @@ read_stmt: Stmt = {
         .map(|id| {
             Identifier {
                 id: id.to_string(),
-                sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+                data_type: SymbolTable::symbol_type_for(id).unwrap(),
             }
         })
         .collect();
@@ -275,7 +276,7 @@ write_stmt: Stmt = {
         .map(|id| {
             Identifier {
                 id: id.to_string(),
-                sym_type: SymbolTable::symbol_type_for(id).unwrap(),
+                data_type: SymbolTable::symbol_type_for(id).unwrap(),
             }
         })
         .collect();
@@ -413,10 +414,10 @@ primary: Expr = {
     "(" <expr> ")",
     <IDENTIFIER> => {
         // TODO: Handle failure case when symbol does not exist
-        let sym_type = SymbolTable::symbol_type_for(<>).unwrap();
+        let data_type = SymbolTable::symbol_type_for(<>).unwrap();
         Expr::Id(Identifier {
             id: <>.to_string(),
-            sym_type
+            data_type
         })
     },
     <INTLITERAL> => {

@@ -1,4 +1,4 @@
-use crate::symbol_table::SymbolType;
+use crate::symbol_table::symbol::data::DataType;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -36,11 +36,11 @@ pub enum CmpOp {
 }
 
 /// Represents an identifier
-/// for a declared symbol.
+/// for a declared data symbol.
 #[derive(Debug, Clone)]
 pub struct Identifier {
     pub id: String,
-    pub sym_type: SymbolType,
+    pub data_type: DataType,
 }
 
 /// Math expressions in Microc

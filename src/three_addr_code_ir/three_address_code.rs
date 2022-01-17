@@ -155,8 +155,11 @@ pub enum ThreeAddressCode {
 // TODO: Factor out all type checking into its own visitor.
 pub mod visit {
     use crate::ast::ast_node::visit::Visitor;
-    use crate::ast::ast_node::{AddOp, Assignment, AstNode, CmpOp, Condition, Expr, MulOp, Stmt};
-    use crate::symbol_table::{NumType, SymbolType};
+    use crate::ast::ast_node::{
+        AddOp, Assignment, AstNode, CmpOp, Condition, Expr, Item, MulOp, Stmt,
+    };
+    use crate::symbol_table::symbol::data::DataType;
+    use crate::symbol_table::symbol::NumType;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
@@ -211,11 +214,11 @@ pub mod visit {
                 Stmt::Read(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| match identifier.sym_type {
-                            SymbolType::String => {
+                        .map(|identifier| match identifier.data_type {
+                            DataType::String => {
                                 panic!("Unsupported operation: cannot READ into string identifier!")
                             }
-                            SymbolType::Num(num_type) => match num_type {
+                            DataType::Num(num_type) => match num_type {
                                 NumType::Int => ThreeAddressCode::ReadI {
                                     identifier: identifier.into(),
                                 },
@@ -231,11 +234,11 @@ pub mod visit {
                 Stmt::Write(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| match identifier.sym_type {
-                            SymbolType::String => ThreeAddressCode::WriteS {
+                        .map(|identifier| match identifier.data_type {
+                            DataType::String => ThreeAddressCode::WriteS {
                                 identifier: identifier.into(),
                             },
-                            SymbolType::Num(num_type) => match num_type {
+                            DataType::Num(num_type) => match num_type {
                                 NumType::Int => ThreeAddressCode::WriteI {
                                     identifier: identifier.into(),
                                 },
@@ -336,7 +339,7 @@ pub mod visit {
         fn visit_expression(&mut self, expr: Expr) -> CodeObject {
             match expr {
                 Expr::Id(identifier) => {
-                    let result_type = identifier.sym_type.into();
+                    let result_type = identifier.data_type.into();
 
                     let result: BinaryExprOperand = match result_type {
                         ResultType::Int => IdentI(identifier.id).into(),
@@ -544,11 +547,11 @@ pub mod visit {
                 rhs.code_sequence,
             );
 
-            let assign_code = match lhs.sym_type {
-                SymbolType::String => {
+            let assign_code = match lhs.data_type {
+                DataType::String => {
                     panic!("Unsupported operation: Cannot ASSIGN to a string identifier!")
                 }
-                SymbolType::Num(num_type) => match num_type {
+                DataType::Num(num_type) => match num_type {
                     NumType::Int => ThreeAddressCode::StoreI {
                         lhs: LValueI::Id(IdentI(lhs.id)),
                         rhs: curr_operand,
@@ -672,13 +675,14 @@ pub mod visit {
 #[cfg(test)]
 mod test {
     use crate::ast::ast_node::{AddOp, AstNode, CmpOp, Condition, Expr, Identifier, MulOp};
-    use crate::symbol_table::{NumType, SymbolType};
     use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
     use crate::three_addr_code_ir::ResultType;
 
     use super::*;
     use crate::ast::ast_node;
     use crate::ast::ast_node::AstNode::Stmt;
+    use crate::symbol_table::symbol::data::DataType;
+    use crate::symbol_table::symbol::NumType;
 
     #[test]
     fn convert_simple_int_expression_ast_to_code_object() {
@@ -695,16 +699,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int),
+                    data_type: DataType::Num(NumType::Int),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int),
+                    data_type: DataType::Num(NumType::Int),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Int),
+                data_type: DataType::Num(NumType::Int),
             })),
         });
 
@@ -737,16 +741,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float),
+                    data_type: DataType::Num(NumType::Float),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float),
+                    data_type: DataType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float),
+                data_type: DataType::Num(NumType::Float),
             })),
         });
 
@@ -773,16 +777,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::String,
+                    data_type: DataType::String,
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float),
+                    data_type: DataType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float),
+                data_type: DataType::Num(NumType::Float),
             })),
         });
 
@@ -799,11 +803,11 @@ mod test {
                 cmp_op: CmpOp::Lt,
                 lhs: Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::String,
+                    data_type: DataType::String,
                 }),
                 rhs: Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float),
+                    data_type: DataType::Num(NumType::Float),
                 }),
             },
             then_block: vec![],
@@ -825,16 +829,16 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Int),
+                    data_type: DataType::Num(NumType::Int),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     id: "b".to_string(),
-                    sym_type: SymbolType::Num(NumType::Float),
+                    data_type: DataType::Num(NumType::Float),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 id: "a".to_string(),
-                sym_type: SymbolType::Num(NumType::Float),
+                data_type: DataType::Num(NumType::Float),
             })),
         });
 
