@@ -2,7 +2,7 @@ use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, S
 use crate::symbol_table::SymbolTable;
 use crate::symbol_table::symbol::NumType;
 use crate::symbol_table::symbol::{data::DataSymbol, function::FunctionSymbol};
-use crate::symbol_table;
+use crate::symbol_table::scope;
 use lalrpop_util::ParseError;
 use std::str::FromStr;
 
@@ -90,8 +90,8 @@ string_decl: () = {
         SymbolTable::add_data_symbol(DataSymbol::String {
             name: id.to_owned(),
             value: val.to_owned()
-        }, false).or_else(|decl_err| {
-            SymbolTable::set_decl_error(decl_err);
+        }, false).or_else(|err| {
+            SymbolTable::add_symbol_error(err);
             Err(ParseError::User {
                 error: "Encountered declaration error!",
             })
@@ -105,8 +105,8 @@ var_decl: () = {
             match ty {
                 NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, false),
                 NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, false),
-            }.or_else(|decl_err| {
-                SymbolTable::set_decl_error(decl_err);
+            }.or_else(|err| {
+                SymbolTable::add_symbol_error(err);
                 Err(ParseError::User {
                     error: "Encountered declaration error!",
                 })
@@ -148,8 +148,8 @@ param_decl: () = {
         match ty {
             NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, true),
             NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, true),
-        }.or_else(|decl_err| {
-            SymbolTable::set_decl_error(decl_err);
+        }.or_else(|err| {
+            SymbolTable::add_symbol_error(err);
             Err(ParseError::User {
                 error: "Encountered declaration error!",
             })
@@ -192,8 +192,8 @@ start_func: (FunctionReturnType, String) = {
         SymbolTable::add_function_scope(id);
         // TODO: init value for local slot map may need to change
         //  depending on how we store registers.
-        symbol_table::init_stack_frame_local_slot_counter(0);
-        symbol_table::init_stack_frame_param_slot_counter(0);
+        scope::init_stack_frame_local_slot_counter(0);
+        scope::init_stack_frame_param_slot_counter(0);
 
         (return_type, id.to_owned())
     },
@@ -202,8 +202,8 @@ start_func: (FunctionReturnType, String) = {
 end_func: () = {
     END => {
         SymbolTable::end_curr_scope();
-        symbol_table::reset_stack_frame_local_slot_counter();
-        symbol_table::reset_stack_frame_param_slot_counter();
+        scope::reset_stack_frame_local_slot_counter();
+        scope::reset_stack_frame_param_slot_counter();
     },
 };
 
@@ -240,16 +240,23 @@ assign_stmt: Stmt = {
 };
 
 assign_expr: Assignment = {
-    <id: IDENTIFIER> ":=" <expr: expr> => {
+    <id: IDENTIFIER> ":=" <expr: expr> =>? {
+        let symbol = SymbolTable::data_symbol_for_name(id)
+            .or_else(|err| {
+                SymbolTable::add_symbol_error(err);
+                Err(ParseError::User {
+                    error: "Encountered declaration error!",
+                })
+            })?;
+
         let lhs = Identifier {
-            id: id.to_string(),
-            data_type: SymbolTable::symbol_type_for(id).unwrap(),
+            symbol,
         };
 
-        Assignment {
+        Ok(Assignment {
             lhs,
             rhs: expr,
-        }
+        })
     },
 };
 
@@ -258,9 +265,9 @@ read_stmt: Stmt = {
         let id_list: Vec<Identifier> = <>
         .iter()
         .map(|id| {
+            // TODO: Handle errors like in assign_expr
             Identifier {
-                id: id.to_string(),
-                data_type: SymbolTable::symbol_type_for(id).unwrap(),
+                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
             }
         })
         .collect();
@@ -274,9 +281,9 @@ write_stmt: Stmt = {
         let id_list: Vec<Identifier> = <>
         .iter()
         .map(|id| {
+        // TODO: Handle errors like in assign_expr
             Identifier {
-                id: id.to_string(),
-                data_type: SymbolTable::symbol_type_for(id).unwrap(),
+                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
             }
         })
         .collect();
@@ -413,11 +420,9 @@ expr_list_tail: () = {
 primary: Expr = {
     "(" <expr> ")",
     <IDENTIFIER> => {
-        // TODO: Handle failure case when symbol does not exist
-        let data_type = SymbolTable::symbol_type_for(<>).unwrap();
+        // TODO: Handle errors like in assign_expr
         Expr::Id(Identifier {
-            id: <>.to_string(),
-            data_type
+            symbol: SymbolTable::data_symbol_for_name(<>).unwrap(),
         })
     },
     <INTLITERAL> => {

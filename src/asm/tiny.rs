@@ -739,30 +739,30 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
 
 impl From<Vec<ThreeAddressCode>> for TinyCodeSequence {
     fn from(three_adr_code_seq: Vec<ThreeAddressCode>) -> Self {
-        // Add all symbol declarations to tiny code sequence
-        let symbol_decls = SymbolTable::seal()
-            .into_iter()
-            .map(|symbol| match symbol {
-                DataSymbol::String { name, value } => TinyCode::Str(Sid { id: name, value }),
-                DataSymbol::Int { name } => TinyCode::Var(name),
-                DataSymbol::Float { name } => TinyCode::Var(name),
-            })
-            .collect();
-
-        let mut result = TinyCodeSequence {
-            sequence: symbol_decls,
-        };
-
-        result.sequence.extend(
-            three_adr_code_seq
-                .into_iter()
-                .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence),
-        );
-
-        result.sequence.push(TinyCode::Halt);
+        // // Add all symbol declarations to tiny code sequence
+        // let symbol_decls = SymbolTable::seal()
+        //     .into_iter()
+        //     .map(|symbol| match symbol {
+        //         DataSymbol::String { name, value } => TinyCode::Str(Sid { id: name, value }),
+        //         DataSymbol::Int { name } => TinyCode::Var(name),
+        //         DataSymbol::Float { name } => TinyCode::Var(name),
+        //     })
+        //     .collect();
+        //
+        // let mut result = TinyCodeSequence {
+        //     sequence: symbol_decls,
+        // };
+        //
+        // result.sequence.extend(
+        //     three_adr_code_seq
+        //         .into_iter()
+        //         .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence),
+        // );
+        //
+        // result.sequence.push(TinyCode::Halt);
 
         TinyCodeSequence {
-            sequence: result.sequence,
+            sequence: vec![], // result.sequence,
         }
     }
 }
