@@ -5,9 +5,9 @@ use getset::Getters;
 /// the same name in the same scope.
 #[derive(Debug, derive_more::Error, derive_more::Display, Getters)]
 #[display(
-fmt = "Symbol [{}] was declared in scope [{}] multiple times.",
-symbol_name,
-scope_name
+    fmt = "Symbol [{}] was declared in scope [{}] multiple times.",
+    symbol_name,
+    scope_name
 )]
 #[getset(get = "pub")]
 pub struct DeclareExistingSymbolError {
@@ -28,9 +28,9 @@ impl DeclareExistingSymbolError {
 /// from usage of undeclared symbols.
 #[derive(Debug, derive_more::Error, derive_more::Display, Getters)]
 #[display(
-fmt = "Symbol [{}], declaration not found in scope [{}].",
-symbol_name,
-scope_name
+    fmt = "Symbol [{}], declaration not found in scope [{}].",
+    symbol_name,
+    scope_name
 )]
 #[getset(get = "pub")]
 pub struct UseUndeclaredSymbolError {

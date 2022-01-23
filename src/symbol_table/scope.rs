@@ -1,11 +1,11 @@
-use linked_hash_set::LinkedHashSet;
-use std::rc::Rc;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use crate::symbol_table::error::{DeclareExistingSymbolError, UseUndeclaredSymbolError};
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use crate::symbol_table::symbol::data::DataSymbol;
 use crate::symbol_table::symbol::function::FunctionSymbol;
+use linked_hash_set::LinkedHashSet;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 static STACK_FRAME_LOCAL_SLOT_COUNTER: AtomicI32 = AtomicI32::new(0);
 static STACK_FRAME_PARAM_SLOT_COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -25,7 +25,6 @@ pub fn init_stack_frame_param_slot_counter(n: u32) {
 pub fn reset_stack_frame_param_slot_counter() {
     STACK_FRAME_PARAM_SLOT_COUNTER.store(0, Ordering::SeqCst);
 }
-
 
 #[derive(Debug)]
 pub(crate) enum Scope {
@@ -111,7 +110,10 @@ impl Scope {
         }
     }
 
-    pub(crate) fn add_function_symbol(&mut self, symbol: FunctionSymbol) -> Result<(), DeclareExistingSymbolError> {
+    pub(crate) fn add_function_symbol(
+        &mut self,
+        symbol: FunctionSymbol,
+    ) -> Result<(), DeclareExistingSymbolError> {
         if self.contains_function_symbol(&symbol) {
             return Err(DeclareExistingSymbolError::new(
                 self.name().to_owned(),
@@ -170,7 +172,10 @@ impl Scope {
         Ok(())
     }
 
-    pub(crate) fn data_symbol_for_name(&self, symbol_name: &str) -> Result<Rc<DataSymbol>, UseUndeclaredSymbolError> {
+    pub(crate) fn data_symbol_for_name(
+        &self,
+        symbol_name: &str,
+    ) -> Result<Rc<DataSymbol>, UseUndeclaredSymbolError> {
         match self {
             Scope::Global { data_symbols, .. }
             | Scope::Anonymous { data_symbols, .. }
@@ -181,13 +186,18 @@ impl Scope {
                 .ok_or(UseUndeclaredSymbolError::new(
                     self.name().to_owned(),
                     symbol_name.to_owned(),
-                ))
+                )),
         }
     }
 
-    pub(crate) fn function_symbol_for_name(&self, symbol_name: &str) -> Result<Rc<FunctionSymbol>, UseUndeclaredSymbolError> {
+    pub(crate) fn function_symbol_for_name(
+        &self,
+        symbol_name: &str,
+    ) -> Result<Rc<FunctionSymbol>, UseUndeclaredSymbolError> {
         match self {
-            Scope::Global { function_symbols, .. } => function_symbols
+            Scope::Global {
+                function_symbols, ..
+            } => function_symbols
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map(|symbol| symbol.clone())
@@ -195,14 +205,12 @@ impl Scope {
                     self.name().to_owned(),
                     symbol_name.to_owned(),
                 )),
-            Scope::Anonymous { .. }
-            | Scope::Function { .. } => Err(UseUndeclaredSymbolError::new(
+            Scope::Anonymous { .. } | Scope::Function { .. } => Err(UseUndeclaredSymbolError::new(
                 self.name().to_owned(),
                 symbol_name.to_owned(),
-                )),
+            )),
         }
     }
-
 
     fn contains_data_symbol(&self, symbol: &DataSymbol) -> bool {
         match self {

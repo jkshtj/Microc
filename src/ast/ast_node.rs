@@ -1,6 +1,6 @@
 use crate::symbol_table::symbol::data::{DataSymbol, DataType};
-use std::rc::Rc;
 use crate::symbol_table::symbol::NumType;
+use std::rc::Rc;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.

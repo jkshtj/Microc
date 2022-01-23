@@ -1,22 +1,24 @@
 #![allow(unused)]
 
 pub mod error;
-pub mod scope_tree;
 pub mod scope;
+pub mod scope_tree;
 pub mod symbol;
 
+use crate::symbol_table::error::{
+    DeclareExistingSymbolError, SymbolError, UseUndeclaredSymbolError,
+};
+use crate::symbol_table::scope::Scope;
+use crate::symbol_table::scope_tree::ScopeTree;
 use crate::symbol_table::symbol::data::{DataSymbol, DataType};
 use crate::symbol_table::symbol::function::FunctionSymbol;
 use crate::symbol_table::symbol::NumType;
 use linked_hash_set::LinkedHashSet;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use std::rc::Rc;
-use std::cell::RefCell;
-use crate::symbol_table::error::{SymbolError, DeclareExistingSymbolError, UseUndeclaredSymbolError};
-use crate::symbol_table::scope_tree::ScopeTree;
-use crate::symbol_table::scope::Scope;
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 thread_local! {
     /// Thread local, global symbol table that
@@ -77,14 +79,13 @@ impl SymbolTable {
     }
 
     // TODO: add relevant unit tests
-    pub fn add_data_symbol(
-        symbol: DataSymbol,
-        is_func_param: bool,
-    ) -> Result<(), SymbolError> {
+    pub fn add_data_symbol(symbol: DataSymbol, is_func_param: bool) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_data_symbol(symbol, is_func_param).map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
+            active_scope
+                .add_data_symbol(symbol, is_func_param)
+                .map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
             Ok(())
         })
     }
@@ -94,7 +95,9 @@ impl SymbolTable {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_function_symbol(symbol).map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
+            active_scope
+                .add_function_symbol(symbol)
+                .map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
             Ok(())
         })
     }
@@ -103,7 +106,10 @@ impl SymbolTable {
     pub fn data_symbol_for_name(symbol_name: &str) -> Result<Rc<DataSymbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree.active_scope().data_symbol_for_name(symbol_name).map_err(|err| SymbolError::UseUndeclaredSymbol(err))
+            scope_tree
+                .active_scope()
+                .data_symbol_for_name(symbol_name)
+                .map_err(|err| SymbolError::UseUndeclaredSymbol(err))
         })
     }
 
@@ -111,7 +117,10 @@ impl SymbolTable {
     pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<FunctionSymbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree.active_scope().function_symbol_for_name(symbol_name).map_err(|err| SymbolError::UseUndeclaredSymbol(err))
+            scope_tree
+                .active_scope()
+                .function_symbol_for_name(symbol_name)
+                .map_err(|err| SymbolError::UseUndeclaredSymbol(err))
         })
     }
 
@@ -152,7 +161,9 @@ impl SymbolTable {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
             let scope = scope_tree.scope(scope_id);
-            scope.data_symbol_for_name(symbol_name).map_or(false, |_| true)
+            scope
+                .data_symbol_for_name(symbol_name)
+                .map_or(false, |_| true)
         })
     }
 
@@ -182,10 +193,10 @@ mod test {
     // Symbol table does not support
     // concurrent modification.
     use super::*;
+    use crate::symbol_table::scope_tree::ScopeTree;
     use crate::symbol_table::symbol::data::DataType;
     use crate::token::{Token, TokenType};
     use serial_test::serial;
-    use crate::symbol_table::scope_tree::ScopeTree;
 
     fn setup() {
         SYMBOL_TABLE.with(|symbol_table| {
@@ -256,7 +267,10 @@ mod test {
 
         // Should be added under "GLOBAL" scope
         SymbolTable::add_data_symbol(symbol_under_global.clone(), false);
-        assert!(SymbolTable::is_data_symbol_under(0, symbol_under_global.name()));
+        assert!(SymbolTable::is_data_symbol_under(
+            0,
+            symbol_under_global.name()
+        ));
 
         SymbolTable::add_function_scope("ChildOfGlobal");
         assert_eq!(2, SymbolTable::num_scopes());

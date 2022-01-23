@@ -681,7 +681,7 @@ mod test {
     use super::*;
     use crate::ast::ast_node;
     use crate::ast::ast_node::AstNode::Stmt;
-    use crate::symbol_table::symbol::data::{DataType, DataSymbol};
+    use crate::symbol_table::symbol::data::{DataSymbol, DataType};
     use crate::symbol_table::symbol::NumType;
     use std::rc::Rc;
 
@@ -700,18 +700,18 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Int {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Int {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 symbol: Rc::new(DataSymbol::Int {
-                    name: "a".to_string()
+                    name: "a".to_string(),
                 }),
             })),
         });
@@ -745,18 +745,18 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Float {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Float {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 symbol: Rc::new(DataSymbol::Float {
-                    name: "a".to_string()
+                    name: "a".to_string(),
                 }),
             })),
         });
@@ -785,18 +785,18 @@ mod test {
                 lhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::String {
                         name: "b".to_string(),
-                        value: "value".to_string()
+                        value: "value".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Float {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 symbol: Rc::new(DataSymbol::Float {
-                    name: "a".to_string()
+                    name: "a".to_string(),
                 }),
             })),
         });
@@ -815,13 +815,13 @@ mod test {
                 lhs: Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::String {
                         name: "b".to_string(),
-                        value: "v1".to_string()
+                        value: "v1".to_string(),
                     }),
                 }),
                 rhs: Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::String {
                         name: "b".to_string(),
-                        value: "v2".to_string()
+                        value: "v2".to_string(),
                     }),
                 }),
             },
@@ -844,18 +844,18 @@ mod test {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Int {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
                     symbol: Rc::new(DataSymbol::Float {
-                        name: "b".to_string()
+                        name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
                 symbol: Rc::new(DataSymbol::Float {
-                    name: "a".to_string()
+                    name: "a".to_string(),
                 }),
             })),
         });

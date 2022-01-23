@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use crate::symbol_table::scope::Scope;
+use std::fmt::{Display, Formatter};
 
 /// A tree like structure for representing
 /// scopes. Each scope uses one table of
