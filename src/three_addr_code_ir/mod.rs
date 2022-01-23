@@ -59,7 +59,7 @@ pub struct IdentI(pub String);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
-        IdentI(id.id)
+        IdentI(id.to_name())
     }
 }
 
@@ -69,7 +69,7 @@ pub struct IdentF(pub String);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
-        IdentF(id.id)
+        IdentF(id.to_name())
     }
 }
 
@@ -79,7 +79,7 @@ pub struct IdentS(pub String);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
-        IdentS(id.id)
+        IdentS(id.to_name())
     }
 }
 

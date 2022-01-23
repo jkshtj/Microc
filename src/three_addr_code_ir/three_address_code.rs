@@ -214,7 +214,7 @@ pub mod visit {
                 Stmt::Read(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| match identifier.data_type {
+                        .map(|identifier| match identifier.data_type() {
                             DataType::String => {
                                 panic!("Unsupported operation: cannot READ into string identifier!")
                             }
@@ -234,7 +234,7 @@ pub mod visit {
                 Stmt::Write(identifiers) => {
                     let code_sequence = identifiers
                         .into_iter()
-                        .map(|identifier| match identifier.data_type {
+                        .map(|identifier| match identifier.data_type() {
                             DataType::String => ThreeAddressCode::WriteS {
                                 identifier: identifier.into(),
                             },
@@ -339,11 +339,11 @@ pub mod visit {
         fn visit_expression(&mut self, expr: Expr) -> CodeObject {
             match expr {
                 Expr::Id(identifier) => {
-                    let result_type = identifier.data_type.into();
+                    let result_type = identifier.data_type().into();
 
                     let result: BinaryExprOperand = match result_type {
-                        ResultType::Int => IdentI(identifier.id).into(),
-                        ResultType::Float => IdentF(identifier.id).into(),
+                        ResultType::Int => IdentI(identifier.to_name()).into(),
+                        ResultType::Float => IdentF(identifier.to_name()).into(),
                     };
 
                     CodeObject::builder()
@@ -547,17 +547,17 @@ pub mod visit {
                 rhs.code_sequence,
             );
 
-            let assign_code = match lhs.data_type {
+            let assign_code = match lhs.data_type() {
                 DataType::String => {
                     panic!("Unsupported operation: Cannot ASSIGN to a string identifier!")
                 }
                 DataType::Num(num_type) => match num_type {
                     NumType::Int => ThreeAddressCode::StoreI {
-                        lhs: LValueI::Id(IdentI(lhs.id)),
+                        lhs: LValueI::Id(IdentI(lhs.to_name())),
                         rhs: curr_operand,
                     },
                     NumType::Float => ThreeAddressCode::StoreF {
-                        lhs: LValueF::Id(IdentF(lhs.id)),
+                        lhs: LValueF::Id(IdentF(lhs.to_name())),
                         rhs: curr_operand,
                     },
                 },
@@ -681,8 +681,9 @@ mod test {
     use super::*;
     use crate::ast::ast_node;
     use crate::ast::ast_node::AstNode::Stmt;
-    use crate::symbol_table::symbol::data::DataType;
+    use crate::symbol_table::symbol::data::{DataType, DataSymbol};
     use crate::symbol_table::symbol::NumType;
+    use std::rc::Rc;
 
     #[test]
     fn convert_simple_int_expression_ast_to_code_object() {
@@ -698,17 +699,20 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Int),
+                    symbol: Rc::new(DataSymbol::Int {
+                        name: "b".to_string()
+                    }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Int),
+                    symbol: Rc::new(DataSymbol::Int {
+                        name: "b".to_string()
+                    }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                id: "a".to_string(),
-                data_type: DataType::Num(NumType::Int),
+                symbol: Rc::new(DataSymbol::Int {
+                    name: "a".to_string()
+                }),
             })),
         });
 
@@ -740,17 +744,20 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Float),
+                    symbol: Rc::new(DataSymbol::Float {
+                        name: "b".to_string()
+                    }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Float),
+                    symbol: Rc::new(DataSymbol::Float {
+                        name: "b".to_string()
+                    }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                id: "a".to_string(),
-                data_type: DataType::Num(NumType::Float),
+                symbol: Rc::new(DataSymbol::Float {
+                    name: "a".to_string()
+                }),
             })),
         });
 
@@ -776,17 +783,21 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::String,
+                    symbol: Rc::new(DataSymbol::String {
+                        name: "b".to_string(),
+                        value: "value".to_string()
+                    }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Float),
+                    symbol: Rc::new(DataSymbol::Float {
+                        name: "b".to_string()
+                    }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                id: "a".to_string(),
-                data_type: DataType::Num(NumType::Float),
+                symbol: Rc::new(DataSymbol::Float {
+                    name: "a".to_string()
+                }),
             })),
         });
 
@@ -797,17 +808,21 @@ mod test {
 
     #[test]
     #[should_panic]
-    fn convert_condition_comapring_string_identifier_panics() {
+    fn convert_condition_comparing_string_identifier_panics() {
         let ast = AstNode::Stmt(ast_node::Stmt::If {
             condition: Condition {
                 cmp_op: CmpOp::Lt,
                 lhs: Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::String,
+                    symbol: Rc::new(DataSymbol::String {
+                        name: "b".to_string(),
+                        value: "v1".to_string()
+                    }),
                 }),
                 rhs: Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Float),
+                    symbol: Rc::new(DataSymbol::String {
+                        name: "b".to_string(),
+                        value: "v2".to_string()
+                    }),
                 }),
             },
             then_block: vec![],
@@ -828,17 +843,20 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Int),
+                    symbol: Rc::new(DataSymbol::Int {
+                        name: "b".to_string()
+                    }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    id: "b".to_string(),
-                    data_type: DataType::Num(NumType::Float),
+                    symbol: Rc::new(DataSymbol::Float {
+                        name: "b".to_string()
+                    }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                id: "a".to_string(),
-                data_type: DataType::Num(NumType::Float),
+                symbol: Rc::new(DataSymbol::Float {
+                    name: "a".to_string()
+                }),
             })),
         });
 

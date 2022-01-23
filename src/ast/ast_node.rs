@@ -1,5 +1,6 @@
-use crate::symbol_table::symbol::data::{DataType, DataSymbol};
+use crate::symbol_table::symbol::data::{DataSymbol, DataType};
 use std::rc::Rc;
+use crate::symbol_table::symbol::NumType;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -41,6 +42,24 @@ pub enum CmpOp {
 #[derive(Debug, Clone)]
 pub struct Identifier {
     pub symbol: Rc<DataSymbol>,
+}
+
+impl Identifier {
+    pub fn data_type(&self) -> DataType {
+        match *self.symbol {
+            DataSymbol::String { .. } => DataType::String,
+            DataSymbol::Int { .. } => DataType::Num(NumType::Int),
+            DataSymbol::Float { .. } => DataType::Num(NumType::Float),
+        }
+    }
+
+    // TODO: Needs to go away.
+    //  The `IdentI`, `IdentF` and `IdentS`
+    //  structs in 3AC can most likely just
+    //  store a `Rc<DataSymbol>`.
+    pub fn to_name(&self) -> String {
+        self.symbol.name().to_owned()
+    }
 }
 
 /// Math expressions in Microc
