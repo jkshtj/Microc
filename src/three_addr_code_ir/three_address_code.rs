@@ -342,8 +342,8 @@ pub mod visit {
                     let result_type = identifier.data_type().into();
 
                     let result: BinaryExprOperand = match result_type {
-                        ResultType::Int => IdentI(identifier.to_name()).into(),
-                        ResultType::Float => IdentF(identifier.to_name()).into(),
+                        ResultType::Int => IdentI(identifier.symbol).into(),
+                        ResultType::Float => IdentF(identifier.symbol).into(),
                     };
 
                     CodeObject::builder()
@@ -553,11 +553,11 @@ pub mod visit {
                 }
                 DataType::Num(num_type) => match num_type {
                     NumType::Int => ThreeAddressCode::StoreI {
-                        lhs: LValueI::Id(IdentI(lhs.to_name())),
+                        lhs: LValueI::Id(IdentI(lhs.symbol)),
                         rhs: curr_operand,
                     },
                     NumType::Float => ThreeAddressCode::StoreF {
-                        lhs: LValueF::Id(IdentF(lhs.to_name())),
+                        lhs: LValueF::Id(IdentF(lhs.symbol)),
                         rhs: curr_operand,
                     },
                 },

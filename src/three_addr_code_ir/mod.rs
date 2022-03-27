@@ -5,8 +5,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use derive_more::Display;
 
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::symbol::data::DataType;
+use crate::symbol_table::symbol::data::{DataType, DataSymbol};
 use crate::symbol_table::symbol::NumType;
+use std::rc::Rc;
+
 pub mod three_address_code;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -42,7 +44,7 @@ impl TempI {
 
 /// 3AC concept to represent float registers.
 /// There is no limit to the number
-/// of int temporaries that can be created.
+/// of flaot temporaries that can be created.
 #[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
 pub struct TempF(u64);
@@ -55,31 +57,31 @@ impl TempF {
 
 /// Int identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentI(pub String);
+pub struct IdentI(pub Rc<DataSymbol>);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
-        IdentI(id.to_name())
+        IdentI(Rc::clone(&id.symbol))
     }
 }
 
 /// Float identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentF(pub String);
+pub struct IdentF(pub Rc<DataSymbol>);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
-        IdentF(id.to_name())
+        IdentF(Rc::clone(&id.symbol))
     }
 }
 
 /// String identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentS(pub String);
+pub struct IdentS(pub Rc<DataSymbol>);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
-        IdentS(id.to_name())
+        IdentS(Rc::clone(&id.symbol))
     }
 }
 

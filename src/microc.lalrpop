@@ -187,7 +187,7 @@ func_decl: AstNode = {
     },
 };
 
-start_func: (FunctionReturnType, String) = {
+start_func: FunctionSymbol = {
     FUNCTION <return_type: any_type> <id:IDENTIFIER> => {
         SymbolTable::add_function_scope(id);
         // TODO: init value for local slot map may need to change
@@ -195,7 +195,7 @@ start_func: (FunctionReturnType, String) = {
         scope::init_stack_frame_local_slot_counter(0);
         scope::init_stack_frame_param_slot_counter(0);
 
-        (return_type, id.to_owned())
+
     },
 };
 

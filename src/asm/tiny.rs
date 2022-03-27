@@ -10,6 +10,7 @@ use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
+use std::rc::Rc;
 
 static REGISTER_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -46,7 +47,7 @@ impl Register {
 #[derive(Debug, Clone, Display)]
 pub enum Opmr {
     Reg(Register),
-    Id(String),
+    Id(Rc<DataSymbol>),
 }
 
 /// Memory id, stack variable, register or an int literal
@@ -166,7 +167,7 @@ pub enum TinyCode {
     #[display(fmt = "sys writer {}", _0)]
     WriteF(Opmr),
     #[display(fmt = "sys writes {}", _0)]
-    WriteS(String),
+    WriteS(Rc<DataSymbol>),
     #[display(fmt = "sys halt")]
     Halt,
 }

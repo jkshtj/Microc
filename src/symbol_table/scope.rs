@@ -45,7 +45,7 @@ pub(crate) enum Scope {
         // from the frame pointer and are therefore
         // signed integers.
         stack_frame_local_slot_map: HashMap<Rc<DataSymbol>, i32>,
-        //  Global variables have positive offsets from
+        //  Function parameters have positive offsets from
         // the frame pointer and are therefore unsigned
         // integers.
         stack_frame_param_slot_map: HashMap<Rc<DataSymbol>, u32>,

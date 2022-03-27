@@ -1,6 +1,7 @@
 use crate::symbol_table::symbol::data::{DataSymbol, DataType};
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
+use crate::symbol_table::symbol::function::FunctionSymbol;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -51,14 +52,6 @@ impl Identifier {
             DataSymbol::Int { .. } => DataType::Num(NumType::Int),
             DataSymbol::Float { .. } => DataType::Num(NumType::Float),
         }
-    }
-
-    // TODO: Needs to go away.
-    //  The `IdentI`, `IdentF` and `IdentS`
-    //  structs in 3AC can most likely just
-    //  store a `Rc<DataSymbol>`.
-    pub fn to_name(&self) -> String {
-        self.symbol.name().to_owned()
     }
 }
 
@@ -121,15 +114,6 @@ pub enum Stmt {
     },
 }
 
-/// Represents possible return types
-/// in a function.
-#[derive(Debug, Clone, Copy)]
-pub enum FunctionReturnType {
-    Int,
-    Float,
-    Void,
-}
-
 /// Represents constructs in Microc
 /// that can be composed from expressions
 /// and statements. Currently, the only
@@ -139,8 +123,7 @@ pub enum FunctionReturnType {
 #[derive(Debug, Clone)]
 pub enum Item {
     Function {
-        name: String,
-        return_type: FunctionReturnType,
+        symbol: Rc<FunctionSymbol>,
         body: Vec<Stmt>,
     },
 }
