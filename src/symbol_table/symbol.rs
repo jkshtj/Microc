@@ -13,7 +13,7 @@ pub mod data {
         Num(NumType),
     }
 
-    /// Represents a symbol declared in
+    /// Represents a global symbol declared in
     /// the program to represent data -
     /// string, int or a float.
     #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
@@ -24,6 +24,7 @@ pub mod data {
         Int { name: String },
         #[display(fmt = "name {} type FLOAT\n", name)]
         Float { name: String },
+        // FunctionDataSymbol(FunctionDataSymbol),
     }
 
     impl DataSymbol {
@@ -34,6 +35,32 @@ pub mod data {
                 DataSymbol::Float { name } => name,
             }
         }
+    }
+
+    #[derive(Debug, Eq, Clone, PartialEq, Hash, derive_more::Display)]
+    pub enum FunctionDataSymbolType {
+        #[display(fmt = "P")]
+        Parameter,
+        #[display(fmt = "L")]
+        Local,
+    }
+
+    /// Represents a symbol in the context of a
+    /// function. The symbol is either a function
+    /// parameter or a local variable and can be
+    /// an int or a float.
+    #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
+    pub enum FunctionDataSymbol {
+        #[display(fmt = "name: {}{} type INT\n", symbol_type, index)]
+        Int {
+            symbol_type: FunctionDataSymbolType,
+            index: u32,
+        },
+        #[display(fmt = "name: {}{} type FLOAT\n", symbol_type, index)]
+        Float {
+            symbol_type: FunctionDataSymbolType,
+            index: u32,
+        },
     }
 }
 
@@ -58,6 +85,14 @@ pub mod function {
     }
 
     impl FunctionSymbol {
+        pub fn new(name: String, return_type: ReturnType, param_list: Vec<NumType>) -> Self {
+            Self {
+                name,
+                return_type,
+                param_list
+            }
+        }
+
         pub fn name(&self) -> &str {
             &self.name
         }

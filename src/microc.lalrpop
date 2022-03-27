@@ -1,10 +1,11 @@
-use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, FunctionReturnType, Item};
+use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, Item};
 use crate::symbol_table::SymbolTable;
 use crate::symbol_table::symbol::NumType;
-use crate::symbol_table::symbol::{data::DataSymbol, function::FunctionSymbol};
+use crate::symbol_table::symbol::{data::{DataSymbol, FunctionDataSymbol, FunctionDataSymbolType}, function::{FunctionSymbol, ReturnType}};
 use crate::symbol_table::scope;
 use lalrpop_util::ParseError;
 use std::str::FromStr;
+use std::rc::Rc;
 
 grammar;
 
@@ -90,7 +91,7 @@ string_decl: () = {
         SymbolTable::add_data_symbol(DataSymbol::String {
             name: id.to_owned(),
             value: val.to_owned()
-        }, false).or_else(|err| {
+        }).or_else(|err| {
             SymbolTable::add_symbol_error(err);
             Err(ParseError::User {
                 error: "Encountered declaration error!",
@@ -103,8 +104,8 @@ var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, false),
-                NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, false),
+                NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}),
+                NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}),
             }.or_else(|err| {
                 SymbolTable::add_symbol_error(err);
                 Err(ParseError::User {
@@ -120,12 +121,12 @@ var_type: NumType = {
     INT => NumType::Int,
 };
 
-any_type: FunctionReturnType = {
+any_type: ReturnType = {
     <var_type> => match <> {
-        NumType::Float => FunctionReturnType::Float,
-        NumType::Int => FunctionReturnType::Int,
+        NumType::Float => ReturnType::Num(NumType::Float),
+        NumType::Int => ReturnType::Num(NumType::Int),
     },
-    VOID => FunctionReturnType::Void,
+    VOID => ReturnType::Void,
 };
 
 id_list: Vec<&'input str> = {
@@ -138,22 +139,31 @@ id_list: Vec<&'input str> = {
     },
 };
 
-param_decl_list: () = {
-    param_decl param_decl_tail,
-    empty,
+param_decl_list: Vec<NumType> = {
+    param_decl param_decl_tail => vec![],
+    empty => vec![],
 };
 
-param_decl: () = {
-    <ty:var_type> <id:IDENTIFIER> =>? {
+param_decl: NumType = {
+    <ty:var_type> <id:IDENTIFIER> => {
         match ty {
-            NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}, true),
-            NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}, true),
-        }.or_else(|err| {
-            SymbolTable::add_symbol_error(err);
-            Err(ParseError::User {
-                error: "Encountered declaration error!",
-            })
-        })
+            NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Float{
+                symbol_type: FunctionDataSymbolType::Parameter,
+                index: scope::get_stack_frame_param_slot_counter(),
+            }),
+            NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Int{
+                symbol_type: FunctionDataSymbolType::Local,
+                index: scope::get_stack_frame_param_slot_counter(),
+            }),
+        };
+        // .or_else(|err| {
+        //     SymbolTable::add_symbol_error(err);
+        //     Err(ParseError::User {
+        //         error: "Encountered declaration error!",
+        //     })
+        // });
+
+        ty
     },
 };
 
@@ -162,13 +172,33 @@ param_decl_tail: () = {
     empty,
 };
 
-// TODO: For STAGE 4 only -
-//  Instead of returning a Vec<AstNode> this should
-//  return a variant of AstNode itself, in the future.
-//
-//  We're also just combining the ast nodes from all
-//  functions. It doesn't matter cause there will only
-// be one function in stage 4.
+func_local_decl: () = {
+    func_local_var_decl func_local_decl,
+    empty,
+};
+
+func_local_var_decl: () = {
+    <ty:var_type> <ids:id_list> ";" =>? {
+        ids.iter().try_for_each(|&id| {
+            match ty {
+                NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Float{
+                    symbol_type: FunctionDataSymbolType::Local,
+                    index: scope::get_stack_frame_local_slot_counter(),
+                }),
+                NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Int{
+                    symbol_type: FunctionDataSymbolType::Local,
+                    index: scope::get_stack_frame_local_slot_counter(),
+                }),
+            }.or_else(|err| {
+                SymbolTable::add_symbol_error(err);
+                Err(ParseError::User {
+                    error: "Encountered declaration error!",
+                })
+            })
+        })
+    },
+};
+
 func_declarations: Vec<AstNode> = {
     <func_decl: func_decl> <mut func_declarations: func_declarations> => {
         func_declarations.push(func_decl);
@@ -178,24 +208,42 @@ func_declarations: Vec<AstNode> = {
 };
 
 func_decl: AstNode = {
-    <metadata: start_func> "("param_decl_list")" BEGIN <body: func_body> end_func => {
-        AstNode::Item(Item::Function {
-            return_type: metadata.0,
-            name: metadata.1,
+    <metadata: start_func> "("<params: param_decl_list>")" BEGIN <body: func_body> end_func =>? {
+        // Create function symbol
+        let func_symbol = FunctionSymbol::new(
+            metadata.0,
+            metadata.1,
+            params,
+        );
+
+        // Add function symbol to symbol table
+        // SymbolTable::add_function_symbol(func_symbol).or_else(|err| {
+        //     SymbolTable::add_symbol_error(err);
+        //     Err(ParseError::User {
+        //         error: "Encountered declaration error!",
+        //     })
+        // });
+        //
+        // // Fetch a Rc pointer to the recently added function symbol from the symbol table
+        // let func_symbol = SymbolTable::function_symbol_for_name(&metadata.0).or_else(|err| {
+        //     SymbolTable::add_symbol_error(err);
+        //     Err(ParseError::User {
+        //         error: "Unable to find specified function symbol!",
+        //     })
+        // }).unwrap();
+
+        // Create the Function node in the AST
+        Ok(AstNode::Item(Item::Function {
+            symbol: Rc::new(func_symbol), // TODO: temp to fix compilation
             body,
-        })
+        }))
     },
 };
 
-start_func: FunctionSymbol = {
+start_func: (String, ReturnType) = {
     FUNCTION <return_type: any_type> <id:IDENTIFIER> => {
         SymbolTable::add_function_scope(id);
-        // TODO: init value for local slot map may need to change
-        //  depending on how we store registers.
-        scope::init_stack_frame_local_slot_counter(0);
-        scope::init_stack_frame_param_slot_counter(0);
-
-
+        (id.to_owned(), return_type)
     },
 };
 
@@ -207,11 +255,8 @@ end_func: () = {
     },
 };
 
-// TODO: For STAGE 4 only -
-//  Instead of returning a Vec<Stmt> this should
-//  return a variant of AstNode itself, in the future.
 func_body: Vec<Stmt> = {
-    decl <stmt_list>,
+    func_local_decl <stmt_list>,
 };
 
 stmt_list: Vec<Stmt> = {

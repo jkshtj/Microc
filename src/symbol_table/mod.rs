@@ -10,7 +10,7 @@ use crate::symbol_table::error::{
 };
 use crate::symbol_table::scope::Scope;
 use crate::symbol_table::scope_tree::ScopeTree;
-use crate::symbol_table::symbol::data::{DataSymbol, DataType};
+use crate::symbol_table::symbol::data::{DataSymbol, DataType, FunctionDataSymbol};
 use crate::symbol_table::symbol::function::FunctionSymbol;
 use crate::symbol_table::symbol::NumType;
 use linked_hash_set::LinkedHashSet;
@@ -79,13 +79,21 @@ impl SymbolTable {
     }
 
     // TODO: add relevant unit tests
-    pub fn add_data_symbol(symbol: DataSymbol, is_func_param: bool) -> Result<(), SymbolError> {
+    pub fn add_data_symbol(symbol: DataSymbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope_mut();
-            active_scope
-                .add_data_symbol(symbol, is_func_param)
-                .map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
+            active_scope.add_data_symbol(symbol)?;
+            Ok(())
+        })
+    }
+
+    // TODO: add relevant unit tests
+    pub fn add_func_data_symbol(name: String, symbol: FunctionDataSymbol) -> Result<(), SymbolError> {
+        SYMBOL_TABLE.with(|symbol_table| {
+            let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
+            let active_scope = scope_tree.active_scope_mut();
+            active_scope.add_func_data_symbol(name, symbol)?;
             Ok(())
         })
     }
@@ -95,9 +103,7 @@ impl SymbolTable {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope_mut();
-            active_scope
-                .add_function_symbol(symbol)
-                .map_err(|err| SymbolError::DeclareExistingSymbol(err))?;
+            active_scope.add_function_symbol(symbol)?;
             Ok(())
         })
     }
@@ -106,10 +112,7 @@ impl SymbolTable {
     pub fn data_symbol_for_name(symbol_name: &str) -> Result<Rc<DataSymbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree
-                .active_scope()
-                .data_symbol_for_name(symbol_name)
-                .map_err(|err| SymbolError::UseUndeclaredSymbol(err))
+            Ok(scope_tree.active_scope().data_symbol_for_name(symbol_name)?)
         })
     }
 
@@ -117,10 +120,7 @@ impl SymbolTable {
     pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<FunctionSymbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree
-                .active_scope()
-                .function_symbol_for_name(symbol_name)
-                .map_err(|err| SymbolError::UseUndeclaredSymbol(err))
+            Ok(scope_tree.active_scope().function_symbol_for_name(symbol_name)?)
         })
     }
 
@@ -257,6 +257,9 @@ mod test {
 
     #[test]
     #[serial]
+    // TODO: Test needs to be updated to reflect changes in
+    // FunctionScope and take into account the addition of
+    // the FunctionDataSymbol type
     fn add_symbol_works() {
         setup();
 
@@ -266,13 +269,13 @@ mod test {
         };
 
         // Should be added under "GLOBAL" scope
-        SymbolTable::add_data_symbol(symbol_under_global.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
             0,
             symbol_under_global.name()
         ));
 
-        SymbolTable::add_function_scope("ChildOfGlobal");
+        SymbolTable::add_anonymous_scope();
         assert_eq!(2, SymbolTable::num_scopes());
 
         let symbol_under_child_of_global = DataSymbol::String {
@@ -281,7 +284,7 @@ mod test {
         };
 
         // Should be added under "ChildOfGlobal" scope
-        SymbolTable::add_data_symbol(symbol_under_child_of_global.clone(), false);
+        SymbolTable::add_data_symbol(symbol_under_child_of_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
             1,
             symbol_under_child_of_global.name()
@@ -296,7 +299,7 @@ mod test {
             name: "global_symbol".to_owned(),
             value: "value1".to_owned(),
         };
-        SymbolTable::add_data_symbol(symbol.clone(), false);
-        assert!(SymbolTable::add_data_symbol(symbol, false).err().is_some());
+        SymbolTable::add_data_symbol(symbol.clone());
+        assert!(SymbolTable::add_data_symbol(symbol).err().is_some());
     }
 }
