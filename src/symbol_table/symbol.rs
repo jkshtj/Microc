@@ -93,17 +93,17 @@ pub mod function {
     pub struct Symbol {
         name: String,
         return_type: ReturnType,
-        params_list: Vec<NumType>,
-        locals_list: Vec<NumType>,
+        params: Vec<NumType>,
+        locals: Vec<NumType>,
     }
 
     impl Symbol {
-        pub fn new(name: String, return_type: ReturnType, param_list: Vec<NumType>, locals_list: Vec<NumType>) -> Self {
+        pub fn new(name: String, return_type: ReturnType, params: Vec<NumType>, locals: Vec<NumType>) -> Self {
             Self {
                 name,
                 return_type,
-                params_list: param_list,
-                locals_list,
+                params: params,
+                locals,
             }
         }
 

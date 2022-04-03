@@ -82,21 +82,21 @@ fn main() {
         let mut result = program.unwrap();
         let mut visitor = ThreeAddressCodeVisitor;
         result.reverse();
-        let three_addr_codes: Vec<ThreeAddressCode> = result
-            .into_iter()
-            .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
-            .collect();
+        // let three_addr_codes: Vec<ThreeAddressCode> = result
+        //     .into_iter()
+        //     .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
+        //     .collect();
 
         // three_addr_codes
         //     .clone()
         //     .into_iter()
         //     .for_each(|code| println!(";{}", code));
 
-        let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        tiny_code
-            .sequence
-            .into_iter()
-            .for_each(|code| println!("{}", code));
+        // let tiny_code: TinyCodeSequence = three_addr_codes.into();
+        // tiny_code
+        //     .sequence
+        //     .into_iter()
+        //     .for_each(|code| println!("{}", code));
         /*******************************/
 
         Ok(())

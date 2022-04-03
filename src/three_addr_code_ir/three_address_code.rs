@@ -333,6 +333,8 @@ pub mod visit {
 
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
+                // TODO: Remove after RETURN statement is added
+                Stmt::None => todo!(),
             }
         }
 

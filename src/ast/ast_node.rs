@@ -119,6 +119,8 @@ pub enum Stmt {
         incr: Option<Assignment>,
         body: Vec<Stmt>,
     },
+    // TODO: Remove after RETURN statement is added
+    None
 }
 
 /// Represents constructs in Microc

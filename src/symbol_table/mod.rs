@@ -79,7 +79,7 @@ impl SymbolTable {
     }
 
     // TODO: add relevant unit tests
-    pub fn add_data_symbol(symbol: data::NonFunctionScopedSymbol) -> Result<(), SymbolError> {
+    pub fn add_non_func_scoped_symbol(symbol: data::NonFunctionScopedSymbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope();
@@ -89,7 +89,7 @@ impl SymbolTable {
     }
 
     // TODO: add relevant unit tests
-    pub fn add_func_data_symbol(name: String, symbol: data::FunctionScopedSymbol) -> Result<(), SymbolError> {
+    pub fn add_func_scoped_symbol(name: String, symbol: data::FunctionScopedSymbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope();
@@ -274,7 +274,7 @@ mod test {
 
         let global = SymbolTable::global_scope();
         // Should be added under "GLOBAL" scope
-        SymbolTable::add_data_symbol(symbol_under_global.clone());
+        SymbolTable::add_non_func_scoped_symbol(symbol_under_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
             global,
             symbol_under_global.name()
@@ -290,7 +290,7 @@ mod test {
 
         let child_of_global = SymbolTable::active_scope();
         // Should be added under "ChildOfGlobal" scope
-        SymbolTable::add_data_symbol(symbol_under_child_of_global.clone());
+        SymbolTable::add_non_func_scoped_symbol(symbol_under_child_of_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
             child_of_global,
             symbol_under_child_of_global.name()
@@ -305,7 +305,7 @@ mod test {
             name: "global_symbol".to_owned(),
             value: "value1".to_owned(),
         };
-        SymbolTable::add_data_symbol(symbol.clone());
-        assert!(SymbolTable::add_data_symbol(symbol).err().is_some());
+        SymbolTable::add_non_func_scoped_symbol(symbol.clone());
+        assert!(SymbolTable::add_non_func_scoped_symbol(symbol).err().is_some());
     }
 }

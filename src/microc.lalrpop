@@ -1,7 +1,7 @@
 use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, Item};
 use crate::symbol_table::SymbolTable;
 use crate::symbol_table::symbol::NumType;
-use crate::symbol_table::symbol::{data::{NonFunctionScopedSymbol, FunctionScopedSymbol, FunctionScopedSymbolType}, function::{Symbol, ReturnType}};
+use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::scope;
 use lalrpop_util::ParseError;
 use std::str::FromStr;
@@ -77,18 +77,18 @@ end_program: () = {
 empty: () = ();
 
 pgm_body: Vec<AstNode> = {
-    decl <func_declarations>,
+    non_func_scoped_decl <func_declarations>,
 };
 
-decl: () = {
-    string_decl decl,
-    var_decl decl,
+non_func_scoped_decl: () = {
+    non_func_scoped_string_decl non_func_scoped_decl,
+    non_func_scoped_var_decl non_func_scoped_decl,
     empty,
 };
 
-string_decl: () = {
+non_func_scoped_string_decl: () = {
     STRING <id:IDENTIFIER> ":=" <val:STRINGLITERAL> ";" =>? {
-        SymbolTable::add_data_symbol(NonFunctionScopedSymbol::String {
+        SymbolTable::add_non_func_scoped_symbol(data::NonFunctionScopedSymbol::String {
             name: id.to_owned(),
             value: val.to_owned()
         }).or_else(|err| {
@@ -100,12 +100,12 @@ string_decl: () = {
     },
 };
 
-var_decl: () = {
+non_func_scoped_var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_data_symbol(NonFunctionScopedSymbol::Float { name: id.to_owned()}),
-                NumType::Int => SymbolTable::add_data_symbol(NonFunctionScopedSymbol::Int { name: id.to_owned()}),
+                NumType::Float => SymbolTable::add_non_func_scoped_symbol(data::NonFunctionScopedSymbol::Float { name: id.to_owned()}),
+                NumType::Int => SymbolTable::add_non_func_scoped_symbol(data::NonFunctionScopedSymbol::Int { name: id.to_owned()}),
             }.or_else(|err| {
                 SymbolTable::add_symbol_error(err);
                 Err(ParseError::User {
@@ -121,12 +121,12 @@ var_type: NumType = {
     INT => NumType::Int,
 };
 
-any_type: ReturnType = {
+any_type: function::ReturnType = {
     <var_type> => match <> {
-        NumType::Float => ReturnType::Num(NumType::Float),
-        NumType::Int => ReturnType::Num(NumType::Int),
+        NumType::Float => function::ReturnType::Num(NumType::Float),
+        NumType::Int => function::ReturnType::Num(NumType::Int),
     },
-    VOID => ReturnType::Void,
+    VOID => function::ReturnType::Void,
 };
 
 id_list: Vec<&'input str> = {
@@ -140,53 +140,55 @@ id_list: Vec<&'input str> = {
 };
 
 param_decl_list: Vec<NumType> = {
-    param_decl param_decl_tail => vec![],
-    empty => vec![],
-};
+    <mut params: (<param_decl> ",")*> <param: param_decl?> => match param {
+            Some(param) => {
+                params.push(param);
+                params
+            },
+            None => params,
+    },
+}
 
 param_decl: NumType = {
-    <ty:var_type> <id:IDENTIFIER> => {
+    <ty:var_type> <id:IDENTIFIER> =>? {
         match ty {
-            NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Float{
-                symbol_type: FunctionScopedSymbolType::Parameter,
+            NumType::Float => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Float{
+                symbol_type: data::FunctionScopedSymbolType::Parameter,
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
-            NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Int{
-                symbol_type: FunctionScopedSymbolType::Local,
+            NumType::Int => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Int{
+                symbol_type: data::FunctionScopedSymbolType::Local,
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
-        };
-        // .or_else(|err| {
-        //     SymbolTable::add_symbol_error(err);
-        //     Err(ParseError::User {
-        //         error: "Encountered declaration error!",
-        //     })
-        // });
+        }.or_else(|err| {
+            SymbolTable::add_symbol_error(err);
+            Err(ParseError::User {
+                error: "Encountered declaration error!",
+            })
+        })?;
 
-        ty
+        Ok(ty)
     },
 };
 
-param_decl_tail: () = {
-    "," param_decl param_decl_tail,
-    empty,
+func_scoped_decl: Vec<NumType> = {
+    <mut locals: func_scoped_var_decl> <mut rest_of_locals: func_scoped_decl> => {
+        locals.append(&mut rest_of_locals);
+        locals
+    },
+    empty => vec![],
 };
 
-func_local_decl: () = {
-    func_local_var_decl func_local_decl,
-    empty,
-};
-
-func_local_var_decl: () = {
+func_scoped_var_decl: Vec<NumType> = {
     <ty:var_type> <ids:id_list> ";" =>? {
-        ids.iter().try_for_each(|&id| {
+        ids.iter().try_fold(vec![], |mut acc, &id| {
             match ty {
-                NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Float{
-                    symbol_type: FunctionScopedSymbolType::Local,
+                NumType::Float => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Float{
+                    symbol_type: data::FunctionScopedSymbolType::Local,
                     index: scope::get_stack_frame_local_slot_counter(),
                 }),
-                NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Int{
-                    symbol_type: FunctionScopedSymbolType::Local,
+                NumType::Int => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Int{
+                    symbol_type: data::FunctionScopedSymbolType::Local,
                     index: scope::get_stack_frame_local_slot_counter(),
                 }),
             }.or_else(|err| {
@@ -194,56 +196,62 @@ func_local_var_decl: () = {
                 Err(ParseError::User {
                     error: "Encountered declaration error!",
                 })
-            })
+            })?;
+
+            acc.push(ty);
+            Ok(acc)
         })
     },
 };
 
 func_declarations: Vec<AstNode> = {
     <func_decl: func_decl> <mut func_declarations: func_declarations> => {
-        todo!()
-        // func_declarations.push(func_decl);
-        // func_declarations
+        println!("{:?}", func_decl);
+        func_declarations.push(func_decl);
+        func_declarations
     },
     empty => vec![],
 };
 
-func_decl: () = {
-    <metadata: start_func> "("<params: param_decl_list>")" BEGIN <body: func_body> end_func =>? {
-        // Create function symbol
-        // let func_symbol = Symbol::new(
-        //     metadata.0,
-        //     metadata.1,
-        //     params,
-        //     loca
-        // );
+func_decl: AstNode = {
+    <metadata: start_func> "("<params: param_decl_list>")" BEGIN <func_parts: func_body> end_func =>? {
+        let func_name = metadata.0;
+        let return_type = metadata.1;
+        let locals = func_parts.0;
+        let body = func_parts.1;
 
-        // Add function symbol to symbol table
-        // SymbolTable::add_function_symbol(func_symbol).or_else(|err| {
-        //     SymbolTable::add_symbol_error(err);
-        //     Err(ParseError::User {
-        //         error: "Encountered declaration error!",
-        //     })
-        // });
-        //
-        // // Fetch a Rc pointer to the recently added function symbol from the symbol table
-        // let func_symbol = SymbolTable::function_symbol_for_name(&metadata.0).or_else(|err| {
-        //     SymbolTable::add_symbol_error(err);
-        //     Err(ParseError::User {
-        //         error: "Unable to find specified function symbol!",
-        //     })
-        // }).unwrap();
+        let func_symbol = function::Symbol::new(
+            func_name.clone(),
+            return_type,
+            params,
+            locals,
+        );
 
-        // Create the Function node in the AST
-        // Ok(AstNode::Item(Item::Function {
-        //     symbol: Rc::new(func_symbol), // TODO: temp to fix compilation
-        //     body,
-        // }))
-        Ok(())
+        SymbolTable::add_function_symbol(func_symbol)
+        .or_else(|err| {
+            SymbolTable::add_symbol_error(err);
+            Err(ParseError::User {
+                error: "Encountered declaration error!",
+            })
+        })?;
+
+        let symbol = SymbolTable::function_symbol_for_name(&func_name)
+        .or_else(|err| {
+            SymbolTable::add_symbol_error(err);
+            Err(ParseError::User {
+                error: "Unable to find specified function symbol!",
+            })
+        })?;
+
+        //Create the Function node in the AST
+        Ok(AstNode::Item(Item::Function {
+            symbol,
+            body,
+        }))
     },
 };
 
-start_func: (String, ReturnType) = {
+start_func: (String, function::ReturnType) = {
     FUNCTION <return_type: any_type> <id:IDENTIFIER> => {
         SymbolTable::add_function_scope(id);
         (id.to_owned(), return_type)
@@ -258,8 +266,8 @@ end_func: () = {
     },
 };
 
-func_body: Vec<Stmt> = {
-    func_local_decl <stmt_list>,
+func_body: (Vec<NumType>, Vec<Stmt>) = {
+    <locals: func_scoped_decl> <stmts: stmt_list> => (locals, stmts),
 };
 
 stmt_list: Vec<Stmt> = {
@@ -293,7 +301,7 @@ assign_expr: Assignment = {
             .or_else(|err| {
                 SymbolTable::add_symbol_error(err);
                 Err(ParseError::User {
-                    error: "Encountered declaration error!",
+                    error: "Use of undeclared symbol!",
                 })
             })?;
 
@@ -340,8 +348,11 @@ write_stmt: Stmt = {
     },
 };
 
+// TODO: Fixme!
 return_stmt: Stmt = {
-    RETURN <expr> ";" => todo!(), // TODO: Fixme!
+    RETURN <expr> ";" => {
+        Stmt::None
+    }
 };
 
 expr: Expr = {
@@ -519,7 +530,7 @@ mulop: Expr = {
 
 if_stmt: Stmt = {
     // TODO: What should `decl` return?
-    start_if "(" <condition: cond> ")" decl <mut then_block: stmt_list> <mut else_block: else_part> end_if_or_else => {
+    start_if "(" <condition: cond> ")" non_func_scoped_decl <mut then_block: stmt_list> <mut else_block: else_part> end_if_or_else => {
         // TODO: ADD a comment for why we need to reverse.
         then_block.reverse();
         else_block.reverse();
@@ -546,7 +557,7 @@ end_if_or_else: () = {
 
 else_part: Vec<Stmt> = {
     // TODO: What should `decl` return?
-    start_else decl <stmt_list: stmt_list> => stmt_list,
+    start_else non_func_scoped_decl <stmt_list: stmt_list> => stmt_list,
     empty => vec![],
 };
 
@@ -588,7 +599,7 @@ incr_stmt: Option<Assignment> = {
 
 for_stmt: Stmt = {
     // TODO: What should `decl` return?
-    start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" decl <mut body: stmt_list> end_for => {
+    start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" non_func_scoped_decl <mut body: stmt_list> end_for => {
         // TODO: Add a comment for why we need to reverse statements.
         body.reverse();
 
