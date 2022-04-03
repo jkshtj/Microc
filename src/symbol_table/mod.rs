@@ -10,8 +10,8 @@ use crate::symbol_table::error::{
 };
 use crate::symbol_table::scope::Scope;
 use crate::symbol_table::scope_tree::ScopeTree;
-use crate::symbol_table::symbol::data::{DataSymbol, DataType, FunctionDataSymbol};
-use crate::symbol_table::symbol::function::FunctionSymbol;
+use crate::symbol_table::symbol::data;
+use crate::symbol_table::symbol::function;
 use crate::symbol_table::symbol::NumType;
 use linked_hash_set::LinkedHashSet;
 use std::cell::RefCell;
@@ -51,13 +51,13 @@ impl SymbolTable {
     pub fn add_anonymous_scope() {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope_id = scope_tree.active_scope_id();
+            let active_scope = scope_tree.active_scope();
 
             let anonymous_scope_name = format!(
                 "BLOCK{}",
                 ANONYMOUS_SCOPE_COUNTER.fetch_add(1, Ordering::SeqCst)
             );
-            let new_scope = Scope::new_anonymous(anonymous_scope_name, Some(active_scope_id));
+            let new_scope = Scope::new_anonymous(anonymous_scope_name, active_scope);
             scope_tree.add_new_scope(new_scope);
         })
     }
@@ -65,9 +65,9 @@ impl SymbolTable {
     pub fn add_function_scope<T: ToString + Debug>(name: T) {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope_id = scope_tree.active_scope_id();
+            let active_scope = scope_tree.active_scope();
 
-            let new_scope = Scope::new_function(name, Some(active_scope_id));
+            let new_scope = Scope::new_function(name, active_scope);
             scope_tree.add_new_scope(new_scope);
         })
     }
@@ -79,48 +79,48 @@ impl SymbolTable {
     }
 
     // TODO: add relevant unit tests
-    pub fn add_data_symbol(symbol: DataSymbol) -> Result<(), SymbolError> {
+    pub fn add_data_symbol(symbol: data::NonFunctionScopedSymbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_data_symbol(symbol)?;
+            let active_scope = scope_tree.active_scope();
+            active_scope.borrow_mut().add_non_func_scoped_symbol(symbol)?;
             Ok(())
         })
     }
 
     // TODO: add relevant unit tests
-    pub fn add_func_data_symbol(name: String, symbol: FunctionDataSymbol) -> Result<(), SymbolError> {
+    pub fn add_func_data_symbol(name: String, symbol: data::FunctionScopedSymbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_func_data_symbol(name, symbol)?;
+            let active_scope = scope_tree.active_scope();
+            active_scope.borrow_mut().add_func_scoped_symbol(name, symbol)?;
             Ok(())
         })
     }
 
     // TODO: add relevant unit tests
-    pub fn add_function_symbol(symbol: FunctionSymbol) -> Result<(), SymbolError> {
+    pub fn add_function_symbol(symbol: function::Symbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope = scope_tree.active_scope_mut();
-            active_scope.add_function_symbol(symbol)?;
+            let active_scope = scope_tree.active_scope();
+            active_scope.borrow_mut().add_function_symbol(symbol)?;
             Ok(())
         })
     }
 
     // TODO: add relevant unit tests
-    pub fn data_symbol_for_name(symbol_name: &str) -> Result<Rc<DataSymbol>, SymbolError> {
+    pub fn data_symbol_for_name(symbol_name: &str) -> Result<data::Symbol, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            Ok(scope_tree.active_scope().data_symbol_for_name(symbol_name)?)
+            Ok(scope_tree.active_scope().borrow().data_symbol_for_name(symbol_name)?)
         })
     }
 
     // TODO: add relevant unit tests
-    pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<FunctionSymbol>, SymbolError> {
+    pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<function::Symbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            Ok(scope_tree.active_scope().function_symbol_for_name(symbol_name)?)
+            Ok(scope_tree.active_scope().borrow().function_symbol_for_name(symbol_name)?)
         })
     }
 
@@ -141,39 +141,41 @@ impl SymbolTable {
     }
 
     #[cfg(test)]
-    fn active_scope_id() -> usize {
+    fn global_scope() -> Rc<RefCell<Scope>> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree.active_scope_id()
+            scope_tree.global_scope()
         })
     }
 
     #[cfg(test)]
-    fn parent_of_scope(id: usize) -> Option<usize> {
+    fn active_scope() -> Rc<RefCell<Scope>> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            scope_tree.parent_id(id)
+            scope_tree.active_scope()
         })
     }
 
     #[cfg(test)]
-    fn is_data_symbol_under(scope_id: usize, symbol_name: &str) -> bool {
-        SYMBOL_TABLE.with(|symbol_table| {
-            let scope_tree = &symbol_table.borrow().scope_tree;
-            let scope = scope_tree.scope(scope_id);
-            scope
-                .data_symbol_for_name(symbol_name)
-                .map_or(false, |_| true)
-        })
+    fn is_data_symbol_under(scope: Rc<RefCell<Scope>>, symbol_name: &str) -> bool {
+        scope
+            .borrow()
+            .data_symbol_for_name(symbol_name)
+            .map_or(false, |_| true)
+    }
+
+    #[cfg(test)]
+    fn parent_of_scope(scope: &Rc<RefCell<Scope>>) -> Rc<RefCell<Scope>> {
+        scope.borrow().parent()
     }
 
     #[cfg(test)]
     fn is_active_scope_name(name: &'static str) -> bool {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            let active_scope_id = scope_tree.active_scope_id();
-            let curr_scope = scope_tree.scope(active_scope_id);
-            curr_scope.name() == name
+            let active_scope = scope_tree.active_scope();
+            let active_scope = active_scope.borrow();
+            active_scope.name() == name
         })
     }
 
@@ -181,9 +183,9 @@ impl SymbolTable {
     fn active_scope_name() -> String {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            let active_scope_id = scope_tree.active_scope_id();
-            let curr_scope = scope_tree.scope(active_scope_id);
-            curr_scope.name().to_owned()
+            let active_scope = scope_tree.active_scope();
+            let active_scope = active_scope.borrow();
+            active_scope.name().to_owned()
         })
     }
 }
@@ -219,40 +221,42 @@ mod test {
         SymbolTable::add_function_scope("ChildOfGlobal");
         assert_eq!(2, SymbolTable::num_scopes());
 
-        let curr_scope = SymbolTable::active_scope_id();
-        assert_eq!(Some(0), SymbolTable::parent_of_scope(curr_scope));
+        let curr_scope = SymbolTable::active_scope();
+        let global_scope = SymbolTable::global_scope();
+        assert_eq!(global_scope, SymbolTable::parent_of_scope(&curr_scope));
     }
 
     #[test]
     #[serial]
     fn add_anonymous_scope_works() {
         setup();
-
         assert!(SymbolTable::is_active_scope_name("GLOBAL"));
+
+        let global_scope = SymbolTable::global_scope();
 
         SymbolTable::add_anonymous_scope();
         // Num scopes
         assert_eq!(2, SymbolTable::num_scopes());
         // Anonymous scope names
         assert!(SymbolTable::is_active_scope_name("BLOCK1"));
-        let curr_scope = SymbolTable::active_scope_id();
+        let curr_scope1 = SymbolTable::active_scope();
         // Scope parents
-        assert_eq!(Some(0), SymbolTable::parent_of_scope(curr_scope));
+        assert_eq!(global_scope, SymbolTable::parent_of_scope(&curr_scope1));
 
         SymbolTable::add_function_scope("ChildOfGlobal");
         assert_eq!(3, SymbolTable::num_scopes());
         assert!(SymbolTable::is_active_scope_name("ChildOfGlobal"));
-        let curr_scope = SymbolTable::active_scope_id();
-        assert_eq!(Some(1), SymbolTable::parent_of_scope(curr_scope));
+        let curr_scope2 = SymbolTable::active_scope();
+        assert_eq!(curr_scope1, SymbolTable::parent_of_scope(&curr_scope2));
 
         SymbolTable::add_anonymous_scope();
         // Num scopes
         assert_eq!(4, SymbolTable::num_scopes());
         // Anonymous scope names
         assert!(SymbolTable::is_active_scope_name("BLOCK2"));
-        let curr_scope = SymbolTable::active_scope_id();
+        let curr_scope3 = SymbolTable::active_scope();
         // Scope parents
-        assert_eq!(Some(2), SymbolTable::parent_of_scope(curr_scope));
+        assert_eq!(curr_scope2, SymbolTable::parent_of_scope(&curr_scope3));
     }
 
     #[test]
@@ -263,30 +267,32 @@ mod test {
     fn add_symbol_works() {
         setup();
 
-        let symbol_under_global = DataSymbol::String {
+        let symbol_under_global = data::NonFunctionScopedSymbol::String {
             name: "global_symbol".to_owned(),
             value: "value1".to_owned(),
         };
 
+        let global = SymbolTable::global_scope();
         // Should be added under "GLOBAL" scope
         SymbolTable::add_data_symbol(symbol_under_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
-            0,
+            global,
             symbol_under_global.name()
         ));
 
         SymbolTable::add_anonymous_scope();
         assert_eq!(2, SymbolTable::num_scopes());
 
-        let symbol_under_child_of_global = DataSymbol::String {
+        let symbol_under_child_of_global = data::NonFunctionScopedSymbol::String {
             name: "child_of_global_symbol".to_owned(),
             value: "value1".to_owned(),
         };
 
+        let child_of_global = SymbolTable::active_scope();
         // Should be added under "ChildOfGlobal" scope
         SymbolTable::add_data_symbol(symbol_under_child_of_global.clone());
         assert!(SymbolTable::is_data_symbol_under(
-            1,
+            child_of_global,
             symbol_under_child_of_global.name()
         ));
     }
@@ -295,7 +301,7 @@ mod test {
     #[serial]
     fn adding_conflicting_symbols_in_same_scope_results_in_symbol_error() {
         setup();
-        let symbol = DataSymbol::String {
+        let symbol = data::NonFunctionScopedSymbol::String {
             name: "global_symbol".to_owned(),
             value: "value1".to_owned(),
         };

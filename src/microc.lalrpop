@@ -1,7 +1,7 @@
 use crate::ast::ast_node::{AstNode, AddOp, MulOp, Assignment, Condition, Expr, Stmt, Identifier, CmpOp, Item};
 use crate::symbol_table::SymbolTable;
 use crate::symbol_table::symbol::NumType;
-use crate::symbol_table::symbol::{data::{DataSymbol, FunctionDataSymbol, FunctionDataSymbolType}, function::{FunctionSymbol, ReturnType}};
+use crate::symbol_table::symbol::{data::{NonFunctionScopedSymbol, FunctionScopedSymbol, FunctionScopedSymbolType}, function::{Symbol, ReturnType}};
 use crate::symbol_table::scope;
 use lalrpop_util::ParseError;
 use std::str::FromStr;
@@ -88,7 +88,7 @@ decl: () = {
 
 string_decl: () = {
     STRING <id:IDENTIFIER> ":=" <val:STRINGLITERAL> ";" =>? {
-        SymbolTable::add_data_symbol(DataSymbol::String {
+        SymbolTable::add_data_symbol(NonFunctionScopedSymbol::String {
             name: id.to_owned(),
             value: val.to_owned()
         }).or_else(|err| {
@@ -104,8 +104,8 @@ var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_data_symbol(DataSymbol::Float { name: id.to_owned()}),
-                NumType::Int => SymbolTable::add_data_symbol(DataSymbol::Int { name: id.to_owned()}),
+                NumType::Float => SymbolTable::add_data_symbol(NonFunctionScopedSymbol::Float { name: id.to_owned()}),
+                NumType::Int => SymbolTable::add_data_symbol(NonFunctionScopedSymbol::Int { name: id.to_owned()}),
             }.or_else(|err| {
                 SymbolTable::add_symbol_error(err);
                 Err(ParseError::User {
@@ -147,12 +147,12 @@ param_decl_list: Vec<NumType> = {
 param_decl: NumType = {
     <ty:var_type> <id:IDENTIFIER> => {
         match ty {
-            NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Float{
-                symbol_type: FunctionDataSymbolType::Parameter,
+            NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Float{
+                symbol_type: FunctionScopedSymbolType::Parameter,
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
-            NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Int{
-                symbol_type: FunctionDataSymbolType::Local,
+            NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Int{
+                symbol_type: FunctionScopedSymbolType::Local,
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
         };
@@ -181,12 +181,12 @@ func_local_var_decl: () = {
     <ty:var_type> <ids:id_list> ";" =>? {
         ids.iter().try_for_each(|&id| {
             match ty {
-                NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Float{
-                    symbol_type: FunctionDataSymbolType::Local,
+                NumType::Float => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Float{
+                    symbol_type: FunctionScopedSymbolType::Local,
                     index: scope::get_stack_frame_local_slot_counter(),
                 }),
-                NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionDataSymbol::Int{
-                    symbol_type: FunctionDataSymbolType::Local,
+                NumType::Int => SymbolTable::add_func_data_symbol(id.to_owned(), FunctionScopedSymbol::Int{
+                    symbol_type: FunctionScopedSymbolType::Local,
                     index: scope::get_stack_frame_local_slot_counter(),
                 }),
             }.or_else(|err| {
@@ -201,20 +201,22 @@ func_local_var_decl: () = {
 
 func_declarations: Vec<AstNode> = {
     <func_decl: func_decl> <mut func_declarations: func_declarations> => {
-        func_declarations.push(func_decl);
-        func_declarations
+        todo!()
+        // func_declarations.push(func_decl);
+        // func_declarations
     },
     empty => vec![],
 };
 
-func_decl: AstNode = {
+func_decl: () = {
     <metadata: start_func> "("<params: param_decl_list>")" BEGIN <body: func_body> end_func =>? {
         // Create function symbol
-        let func_symbol = FunctionSymbol::new(
-            metadata.0,
-            metadata.1,
-            params,
-        );
+        // let func_symbol = Symbol::new(
+        //     metadata.0,
+        //     metadata.1,
+        //     params,
+        //     loca
+        // );
 
         // Add function symbol to symbol table
         // SymbolTable::add_function_symbol(func_symbol).or_else(|err| {
@@ -233,10 +235,11 @@ func_decl: AstNode = {
         // }).unwrap();
 
         // Create the Function node in the AST
-        Ok(AstNode::Item(Item::Function {
-            symbol: Rc::new(func_symbol), // TODO: temp to fix compilation
-            body,
-        }))
+        // Ok(AstNode::Item(Item::Function {
+        //     symbol: Rc::new(func_symbol), // TODO: temp to fix compilation
+        //     body,
+        // }))
+        Ok(())
     },
 };
 
@@ -286,54 +289,57 @@ assign_stmt: Stmt = {
 
 assign_expr: Assignment = {
     <id: IDENTIFIER> ":=" <expr: expr> =>? {
-        let symbol = SymbolTable::data_symbol_for_name(id)
-            .or_else(|err| {
-                SymbolTable::add_symbol_error(err);
-                Err(ParseError::User {
-                    error: "Encountered declaration error!",
-                })
-            })?;
-
-        let lhs = Identifier {
-            symbol,
-        };
-
-        Ok(Assignment {
-            lhs,
-            rhs: expr,
-        })
+        todo!()
+        // let symbol = SymbolTable::data_symbol_for_name(id)
+        //     .or_else(|err| {
+        //         SymbolTable::add_symbol_error(err);
+        //         Err(ParseError::User {
+        //             error: "Encountered declaration error!",
+        //         })
+        //     })?;
+        //
+        // let lhs = Identifier {
+        //     symbol,
+        // };
+        //
+        // Ok(Assignment {
+        //     lhs,
+        //     rhs: expr,
+        // })
     },
 };
 
 read_stmt: Stmt = {
     READ "(" <id_list> ")" ";" => {
-        let id_list: Vec<Identifier> = <>
-        .iter()
-        .map(|id| {
-            // TODO: Handle errors like in assign_expr
-            Identifier {
-                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
-            }
-        })
-        .collect();
-
-        Stmt::Read(id_list)
+        todo!()
+        // let id_list: Vec<Identifier> = <>
+        // .iter()
+        // .map(|id| {
+        //     // TODO: Handle errors like in assign_expr
+        //     Identifier {
+        //         symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
+        //     }
+        // })
+        // .collect();
+        //
+        // Stmt::Read(id_list)
     },
 };
 
 write_stmt: Stmt = {
     WRITE "(" <id_list> ")" ";" => {
-        let id_list: Vec<Identifier> = <>
-        .iter()
-        .map(|id| {
-        // TODO: Handle errors like in assign_expr
-            Identifier {
-                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
-            }
-        })
-        .collect();
-
-        Stmt::Write(id_list)
+        todo!()
+        // let id_list: Vec<Identifier> = <>
+        // .iter()
+        // .map(|id| {
+        // // TODO: Handle errors like in assign_expr
+        //     Identifier {
+        //         symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
+        //     }
+        // })
+        // .collect();
+        //
+        // Stmt::Write(id_list)
     },
 };
 
@@ -466,9 +472,10 @@ primary: Expr = {
     "(" <expr> ")",
     <IDENTIFIER> => {
         // TODO: Handle errors like in assign_expr
-        Expr::Id(Identifier {
-            symbol: SymbolTable::data_symbol_for_name(<>).unwrap(),
-        })
+        todo!()
+        // Expr::Id(Identifier {
+        //     symbol: SymbolTable::data_symbol_for_name(<>).unwrap(),
+        // })
     },
     <INTLITERAL> => {
         // TODO: Handle parsing failures

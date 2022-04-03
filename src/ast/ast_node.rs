@@ -1,7 +1,7 @@
-use crate::symbol_table::symbol::data::{DataSymbol, DataType};
+use crate::symbol_table::symbol::data::{NonFunctionScopedSymbol, DataType};
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
-use crate::symbol_table::symbol::function::FunctionSymbol;
+use crate::symbol_table::symbol::function::Symbol;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -42,15 +42,15 @@ pub enum CmpOp {
 /// for a declared data symbol.
 #[derive(Debug, Clone)]
 pub struct Identifier {
-    pub symbol: Rc<DataSymbol>,
+    pub symbol: Rc<NonFunctionScopedSymbol>,
 }
 
 impl Identifier {
     pub fn data_type(&self) -> DataType {
         match *self.symbol {
-            DataSymbol::String { .. } => DataType::String,
-            DataSymbol::Int { .. } => DataType::Num(NumType::Int),
-            DataSymbol::Float { .. } => DataType::Num(NumType::Float),
+            NonFunctionScopedSymbol::String { .. } => DataType::String,
+            NonFunctionScopedSymbol::Int { .. } => DataType::Num(NumType::Int),
+            NonFunctionScopedSymbol::Float { .. } => DataType::Num(NumType::Float),
         }
     }
 }
@@ -123,7 +123,7 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub enum Item {
     Function {
-        symbol: Rc<FunctionSymbol>,
+        symbol: Rc<Symbol>,
         body: Vec<Stmt>,
     },
 }

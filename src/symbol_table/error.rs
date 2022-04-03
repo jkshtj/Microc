@@ -28,20 +28,17 @@ impl DeclareExistingSymbolError {
 /// from usage of undeclared symbols.
 #[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq)]
 #[display(
-    fmt = "Symbol [{}], declaration not found in scope [{}].",
+    fmt = "Use of undeclared symbol: [{}].",
     symbol_name,
-    scope_name
 )]
 #[getset(get = "pub")]
 pub struct UseUndeclaredSymbolError {
-    scope_name: String,
     symbol_name: String,
 }
 
 impl UseUndeclaredSymbolError {
-    pub fn new(scope_name: String, symbol_name: String) -> Self {
+    pub fn new(symbol_name: String) -> Self {
         UseUndeclaredSymbolError {
-            scope_name,
             symbol_name,
         }
     }

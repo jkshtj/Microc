@@ -681,7 +681,7 @@ mod test {
     use super::*;
     use crate::ast::ast_node;
     use crate::ast::ast_node::AstNode::Stmt;
-    use crate::symbol_table::symbol::data::{DataSymbol, DataType};
+    use crate::symbol_table::symbol::data::{NonFunctionScopedSymbol, DataType};
     use crate::symbol_table::symbol::NumType;
     use std::rc::Rc;
 
@@ -699,18 +699,18 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Int {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Int {
                         name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Int {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Int {
                         name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: Rc::new(DataSymbol::Int {
+                symbol: Rc::new(NonFunctionScopedSymbol::Int {
                     name: "a".to_string(),
                 }),
             })),
@@ -744,18 +744,18 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Float {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Float {
                         name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Float {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Float {
                         name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: Rc::new(DataSymbol::Float {
+                symbol: Rc::new(NonFunctionScopedSymbol::Float {
                     name: "a".to_string(),
                 }),
             })),
@@ -783,19 +783,19 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::String {
+                    symbol: Rc::new(NonFunctionScopedSymbol::String {
                         name: "b".to_string(),
                         value: "value".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Float {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Float {
                         name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: Rc::new(DataSymbol::Float {
+                symbol: Rc::new(NonFunctionScopedSymbol::Float {
                     name: "a".to_string(),
                 }),
             })),
@@ -813,13 +813,13 @@ mod test {
             condition: Condition {
                 cmp_op: CmpOp::Lt,
                 lhs: Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::String {
+                    symbol: Rc::new(NonFunctionScopedSymbol::String {
                         name: "b".to_string(),
                         value: "v1".to_string(),
                     }),
                 }),
                 rhs: Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::String {
+                    symbol: Rc::new(NonFunctionScopedSymbol::String {
                         name: "b".to_string(),
                         value: "v2".to_string(),
                     }),
@@ -843,18 +843,18 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Int {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Int {
                         name: "b".to_string(),
                     }),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: Rc::new(DataSymbol::Float {
+                    symbol: Rc::new(NonFunctionScopedSymbol::Float {
                         name: "b".to_string(),
                     }),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: Rc::new(DataSymbol::Float {
+                symbol: Rc::new(NonFunctionScopedSymbol::Float {
                     name: "a".to_string(),
                 }),
             })),

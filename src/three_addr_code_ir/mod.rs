@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use derive_more::Display;
 
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::symbol::data::{DataType, DataSymbol};
+use crate::symbol_table::symbol::data::{DataType, NonFunctionScopedSymbol};
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
 
@@ -57,7 +57,7 @@ impl TempF {
 
 /// Int identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentI(pub Rc<DataSymbol>);
+pub struct IdentI(pub Rc<NonFunctionScopedSymbol>);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
@@ -67,7 +67,7 @@ impl From<Identifier> for IdentI {
 
 /// Float identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentF(pub Rc<DataSymbol>);
+pub struct IdentF(pub Rc<NonFunctionScopedSymbol>);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
@@ -77,7 +77,7 @@ impl From<Identifier> for IdentF {
 
 /// String identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentS(pub Rc<DataSymbol>);
+pub struct IdentS(pub Rc<NonFunctionScopedSymbol>);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
