@@ -1,7 +1,8 @@
-use crate::symbol_table::symbol::data::{NonFunctionScopedSymbol, DataType};
+use crate::symbol_table::symbol::data;
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
-use crate::symbol_table::symbol::function::Symbol;
+use crate::symbol_table::symbol::function;
+use crate::symbol_table::symbol::data::FunctionScopedSymbol;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -42,15 +43,21 @@ pub enum CmpOp {
 /// for a declared data symbol.
 #[derive(Debug, Clone)]
 pub struct Identifier {
-    pub symbol: Rc<NonFunctionScopedSymbol>,
+    pub symbol: data::Symbol,
 }
 
 impl Identifier {
-    pub fn data_type(&self) -> DataType {
-        match *self.symbol {
-            NonFunctionScopedSymbol::String { .. } => DataType::String,
-            NonFunctionScopedSymbol::Int { .. } => DataType::Num(NumType::Int),
-            NonFunctionScopedSymbol::Float { .. } => DataType::Num(NumType::Float),
+    pub fn data_type(&self) -> data::DataType {
+        match &self.symbol {
+            data::Symbol::NonFunctionScopedSymbol(symbol) => match **symbol {
+                    data::NonFunctionScopedSymbol::String { .. } => data::DataType::String,
+                    data::NonFunctionScopedSymbol::Int { .. } => data::DataType::Num(NumType::Int),
+                    data::NonFunctionScopedSymbol::Float { .. } => data::DataType::Num(NumType::Float),
+                }
+            data::Symbol::FunctionScopedSymbol(symbol) => match **symbol {
+                data::FunctionScopedSymbol::Int { .. } => data::DataType::Num(NumType::Int),
+                data::FunctionScopedSymbol::Float { .. } => data::DataType::Num(NumType::Float),
+            },
         }
     }
 }
@@ -123,7 +130,7 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub enum Item {
     Function {
-        symbol: Rc<Symbol>,
+        symbol: Rc<function::Symbol>,
         body: Vec<Stmt>,
     },
 }
@@ -145,6 +152,7 @@ pub mod visit {
     /// that can be generated from the AST
     /// representation of Microc.
     pub trait Visitor<T> {
+        // TODO: Uncomment to generate function code in 3AC.
         // fn visit_item(&mut self, item: Item) -> T;
         fn visit_statement(&mut self, stmt: Stmt) -> T;
         fn visit_expression(&mut self, expr: Expr) -> T;

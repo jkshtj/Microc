@@ -289,57 +289,54 @@ assign_stmt: Stmt = {
 
 assign_expr: Assignment = {
     <id: IDENTIFIER> ":=" <expr: expr> =>? {
-        todo!()
-        // let symbol = SymbolTable::data_symbol_for_name(id)
-        //     .or_else(|err| {
-        //         SymbolTable::add_symbol_error(err);
-        //         Err(ParseError::User {
-        //             error: "Encountered declaration error!",
-        //         })
-        //     })?;
-        //
-        // let lhs = Identifier {
-        //     symbol,
-        // };
-        //
-        // Ok(Assignment {
-        //     lhs,
-        //     rhs: expr,
-        // })
+        let symbol = SymbolTable::data_symbol_for_name(id)
+            .or_else(|err| {
+                SymbolTable::add_symbol_error(err);
+                Err(ParseError::User {
+                    error: "Encountered declaration error!",
+                })
+            })?;
+
+        let lhs = Identifier {
+            symbol,
+        };
+
+        Ok(Assignment {
+            lhs,
+            rhs: expr,
+        })
     },
 };
 
 read_stmt: Stmt = {
     READ "(" <id_list> ")" ";" => {
-        todo!()
-        // let id_list: Vec<Identifier> = <>
-        // .iter()
-        // .map(|id| {
-        //     // TODO: Handle errors like in assign_expr
-        //     Identifier {
-        //         symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
-        //     }
-        // })
-        // .collect();
-        //
-        // Stmt::Read(id_list)
+        let id_list: Vec<Identifier> = <>
+        .iter()
+        .map(|id| {
+            // TODO: Handle errors like in assign_expr
+            Identifier {
+                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
+            }
+        })
+        .collect();
+
+        Stmt::Read(id_list)
     },
 };
 
 write_stmt: Stmt = {
     WRITE "(" <id_list> ")" ";" => {
-        todo!()
-        // let id_list: Vec<Identifier> = <>
-        // .iter()
-        // .map(|id| {
-        // // TODO: Handle errors like in assign_expr
-        //     Identifier {
-        //         symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
-        //     }
-        // })
-        // .collect();
-        //
-        // Stmt::Write(id_list)
+        let id_list: Vec<Identifier> = <>
+        .iter()
+        .map(|id| {
+            // TODO: Handle errors like in assign_expr
+            Identifier {
+                symbol: SymbolTable::data_symbol_for_name(id).unwrap(),
+            }
+        })
+        .collect();
+
+        Stmt::Write(id_list)
     },
 };
 
@@ -472,10 +469,9 @@ primary: Expr = {
     "(" <expr> ")",
     <IDENTIFIER> => {
         // TODO: Handle errors like in assign_expr
-        todo!()
-        // Expr::Id(Identifier {
-        //     symbol: SymbolTable::data_symbol_for_name(<>).unwrap(),
-        // })
+        Expr::Id(Identifier {
+            symbol: SymbolTable::data_symbol_for_name(<>).unwrap(),
+        })
     },
     <INTLITERAL> => {
         // TODO: Handle parsing failures

@@ -18,7 +18,7 @@ pub mod data {
     /// Symbol maybe a `DataSymbol` - declared in
     /// global or anonymous scopes, ot it might be a
     /// `FunctionDataSymbol` - declared in function scopes.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display)]
     pub enum Symbol {
         NonFunctionScopedSymbol(Rc<NonFunctionScopedSymbol>),
         FunctionScopedSymbol(Rc<FunctionScopedSymbol>),

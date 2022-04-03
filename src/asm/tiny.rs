@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atomic_refcell::AtomicRefCell;
 use derive_more::Display;
 
-use crate::symbol_table::symbol::data::NonFunctionScopedSymbol;
+use crate::symbol_table::symbol::data;
 use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
@@ -47,7 +47,7 @@ impl Register {
 #[derive(Debug, Clone, Display)]
 pub enum Opmr {
     Reg(Register),
-    Id(Rc<NonFunctionScopedSymbol>),
+    Id(data::Symbol),
 }
 
 /// Memory id, stack variable, register or an int literal
@@ -167,7 +167,7 @@ pub enum TinyCode {
     #[display(fmt = "sys writer {}", _0)]
     WriteF(Opmr),
     #[display(fmt = "sys writes {}", _0)]
-    WriteS(Rc<NonFunctionScopedSymbol>),
+    WriteS(data::Symbol),
     #[display(fmt = "sys halt")]
     Halt,
 }

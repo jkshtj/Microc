@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use derive_more::Display;
 
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::symbol::data::{DataType, NonFunctionScopedSymbol};
+use crate::symbol_table::symbol::data;
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
 
@@ -57,31 +57,31 @@ impl TempF {
 
 /// Int identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentI(pub Rc<NonFunctionScopedSymbol>);
+pub struct IdentI(pub data::Symbol);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
-        IdentI(Rc::clone(&id.symbol))
+        IdentI(id.symbol.clone())
     }
 }
 
 /// Float identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentF(pub Rc<NonFunctionScopedSymbol>);
+pub struct IdentF(pub data::Symbol);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
-        IdentF(Rc::clone(&id.symbol))
+        IdentF(id.symbol.clone())
     }
 }
 
 /// String identifier
 #[derive(Debug, Display, Clone)]
-pub struct IdentS(pub Rc<NonFunctionScopedSymbol>);
+pub struct IdentS(pub data::Symbol);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
-        IdentS(Rc::clone(&id.symbol))
+        IdentS(id.symbol.clone())
     }
 }
 
@@ -193,13 +193,13 @@ pub enum ResultType {
     Float,
 }
 
-impl From<DataType> for ResultType {
-    fn from(symbol_type: DataType) -> Self {
+impl From<data::DataType> for ResultType {
+    fn from(symbol_type: data::DataType) -> Self {
         match symbol_type {
-            DataType::String => {
+            data::DataType::String => {
                 panic!("STRING type is not a valid result of any 3AC operations.")
             }
-            DataType::Num(t) => match t {
+            data::DataType::Num(t) => match t {
                 NumType::Int => ResultType::Int,
                 NumType::Float => ResultType::Float,
             },
