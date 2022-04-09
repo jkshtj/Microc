@@ -3,7 +3,7 @@ use getset::Getters;
 /// Type to represent errors originating
 /// from multiple symbol declarations with
 /// the same name in the same scope.
-#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq)]
+#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq, Clone)]
 #[display(
     fmt = "Symbol [{}] was declared in scope [{}] multiple times.",
     symbol_name,
@@ -26,7 +26,7 @@ impl DeclareExistingSymbolError {
 
 /// Type to represent errors originating
 /// from usage of undeclared symbols.
-#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq)]
+#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq, Clone)]
 #[display(
     fmt = "Use of undeclared symbol: [{}].",
     symbol_name,
@@ -44,7 +44,7 @@ impl UseUndeclaredSymbolError {
     }
 }
 
-#[derive(Debug, derive_more::Display, Eq, PartialEq)]
+#[derive(Debug, derive_more::Display, Eq, PartialEq, Clone)]
 pub enum ScopeType {
     Global,
     Anonymous,
@@ -55,7 +55,7 @@ pub enum ScopeType {
 /// symbols in contextually invalid scopes - globals
 /// cannot be declared in functions, parameters cannot be
 /// declared outside of functions etc.
-#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq)]
+#[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq, Clone)]
 #[display(
     fmt = "Symbol [{}], cannot be declared in scope with name: [{}] and type: [{}].",
     symbol_name,
@@ -81,7 +81,7 @@ impl DeclareInInvalidScopeError {
 
 /// Type representing possible errors
 /// that can happen while using symbols
-#[derive(Debug, derive_more::Error, derive_more::Display, PartialEq, Eq)]
+#[derive(Debug, derive_more::Error, derive_more::Display, PartialEq, Eq, Clone)]
 pub enum SymbolError {
     /// User tries to declare multiple symbols with
     /// the same name in the same scope

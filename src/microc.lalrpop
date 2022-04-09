@@ -9,6 +9,13 @@ use std::rc::Rc;
 
 grammar;
 
+// TODO: Create a more elaborate error type that
+//  is representative of the error domain for
+//  parsing in microc.
+extern {
+    type Error = String;
+}
+
 //////////////////////////
 ///////// Tokens /////////
 //////////////////////////
@@ -92,9 +99,9 @@ non_func_scoped_string_decl: () = {
             name: id.to_owned(),
             value: val.to_owned()
         }).or_else(|err| {
-            SymbolTable::add_symbol_error(err);
+            SymbolTable::add_symbol_error(err.clone());
             Err(ParseError::User {
-                error: "Encountered declaration error!",
+                error: format!("Encountered declaration error: {:?}", err),
             })
         })
     },
@@ -107,9 +114,9 @@ non_func_scoped_var_decl: () = {
                 NumType::Float => SymbolTable::add_non_func_scoped_symbol(data::NonFunctionScopedSymbol::Float { name: id.to_owned()}),
                 NumType::Int => SymbolTable::add_non_func_scoped_symbol(data::NonFunctionScopedSymbol::Int { name: id.to_owned()}),
             }.or_else(|err| {
-                SymbolTable::add_symbol_error(err);
+                SymbolTable::add_symbol_error(err.clone());
                 Err(ParseError::User {
-                    error: "Encountered declaration error!",
+                    error: format!("Encountered declaration error: {:?}", err),
                 })
             })
         })
@@ -161,9 +168,9 @@ param_decl: NumType = {
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
         }.or_else(|err| {
-            SymbolTable::add_symbol_error(err);
+            SymbolTable::add_symbol_error(err.clone());
             Err(ParseError::User {
-                error: "Encountered declaration error!",
+                error: format!("Encountered declaration error: {:?}", err),
             })
         })?;
 
@@ -192,9 +199,9 @@ func_scoped_var_decl: Vec<NumType> = {
                     index: scope::get_stack_frame_local_slot_counter(),
                 }),
             }.or_else(|err| {
-                SymbolTable::add_symbol_error(err);
+                SymbolTable::add_symbol_error(err.clone());
                 Err(ParseError::User {
-                    error: "Encountered declaration error!",
+                    error: format!("Encountered declaration error: {:?}", err),
                 })
             })?;
 
@@ -300,9 +307,9 @@ assign_expr: Assignment = {
     <id: IDENTIFIER> ":=" <expr: expr> =>? {
         let symbol = SymbolTable::data_symbol_for_name(id)
             .or_else(|err| {
-                SymbolTable::add_symbol_error(err);
+                SymbolTable::add_symbol_error(err.clone());
                 Err(ParseError::User {
-                    error: "Use of undeclared symbol!",
+                    error: "Use of undeclared symbol!".to_owned(),
                 })
             })?;
 
@@ -466,9 +473,9 @@ call_expr: Expr = {
     <func_name: IDENTIFIER> "(" <args: expr_list> ")" =>? {
         let func_symbol = SymbolTable::function_symbol_for_name(func_name)
         .or_else(|err| {
-            SymbolTable::add_symbol_error(err);
+            SymbolTable::add_symbol_error(err.clone());
             Err(ParseError::User {
-                error: "Unable to find specified function symbol!",
+                error: format!("Unable to find specified function symbol: {:?}", err),
             })
         })?;
 
