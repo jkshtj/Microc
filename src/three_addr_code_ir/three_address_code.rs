@@ -333,8 +333,10 @@ pub mod visit {
 
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
-                // TODO: Remove after RETURN statement is added
-                Stmt::None => todo!(),
+                Stmt::Return(_) => todo!("Implement 3AC code gen for return statement"),
+                Stmt::None => {
+                    panic!("Invalid AST: AST statement node contains statement variant `None`.")
+                },
             }
         }
 
@@ -529,6 +531,7 @@ pub mod visit {
                         .code_sequence(left_code_seq)
                         .build()
                 }
+                Expr::Call { .. } => todo!("Implement 3AC code gen for call expression"),
                 Expr::None => {
                     panic!("Invalid AST: AST expression node contains expression variant `None`.")
                 }

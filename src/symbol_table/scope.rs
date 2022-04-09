@@ -112,6 +112,8 @@ impl Scope {
         &mut self,
         symbol: function::Symbol,
     ) -> Result<(), SymbolError> {
+        // TODO: Can I statically assert that self is the `Global`
+        //  variant of type `Scope`?
         if self.contains_function_symbol(&symbol) {
             return Err(SymbolError::DeclareExistingSymbol(
                 DeclareExistingSymbolError::new(
@@ -122,22 +124,8 @@ impl Scope {
         }
 
         match self {
-            Scope::Anonymous { .. } | Scope::Function { .. } => {
-                let scope_type = if let Scope::Anonymous { .. } = self {
-                    ScopeType::Anonymous
-                } else {
-                    ScopeType::Function
-                };
-
-                return Err(SymbolError::DeclareInInvalidSymbolScope(
-                    DeclareInInvalidScopeError::new(
-                        self.name().to_owned(),
-                        scope_type,
-                        symbol.name().to_owned(),
-                    ))
-                );
-            }
             Scope::Global {function_symbols, ..} => function_symbols.insert(Rc::new(symbol)),
+            Scope::Anonymous { .. } | Scope::Function { .. } => unreachable!("A function symbol should never be added to a non-GLOBAL scope!"),
         };
 
         Ok(())
@@ -257,9 +245,7 @@ impl Scope {
                 .ok_or(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
                     symbol_name.to_owned(),
                 ))),
-            Scope::Anonymous { .. } | Scope::Function { .. } => Err(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-                symbol_name.to_owned(),
-            ))),
+            Scope::Anonymous { .. } | Scope::Function { .. } => unreachable!("A function symbol should never be looked up in a non-GLOBAL scope!"),
         }
     }
 

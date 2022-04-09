@@ -102,8 +102,8 @@ impl SymbolTable {
     pub fn add_function_symbol(symbol: function::Symbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
-            let active_scope = scope_tree.active_scope();
-            active_scope.borrow_mut().add_function_symbol(symbol)?;
+            // Functions can only be declared in global scope
+            scope_tree.global_scope().borrow_mut().add_function_symbol(symbol)?;
             Ok(())
         })
     }
@@ -120,7 +120,10 @@ impl SymbolTable {
     pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<function::Symbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            Ok(scope_tree.active_scope().borrow().function_symbol_for_name(symbol_name)?)
+            // Functions are only declared in global scope and
+            // therefore it makes sense to only look for them
+            // in the global scope.
+            Ok(scope_tree.global_scope().borrow().function_symbol_for_name(symbol_name)?)
         })
     }
 

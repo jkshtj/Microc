@@ -214,42 +214,47 @@ func_declarations: Vec<AstNode> = {
 };
 
 func_decl: AstNode = {
-    <metadata: start_func> "("<params: param_decl_list>")" BEGIN <func_parts: func_body> end_func =>? {
-        let func_name = metadata.0;
-        let return_type = metadata.1;
-        let locals = func_parts.0;
-        let body = func_parts.1;
-
-        let func_symbol = function::Symbol::new(
-            func_name.clone(),
-            return_type,
-            params,
-            locals,
-        );
-
-        SymbolTable::add_function_symbol(func_symbol)
-        .or_else(|err| {
-            SymbolTable::add_symbol_error(err);
-            Err(ParseError::User {
-                error: "Encountered declaration error!",
-            })
-        })?;
-
-        let symbol = SymbolTable::function_symbol_for_name(&func_name)
-        .or_else(|err| {
-            SymbolTable::add_symbol_error(err);
-            Err(ParseError::User {
-                error: "Unable to find specified function symbol!",
-            })
-        })?;
-
-        //Create the Function node in the AST
+    <symbol: func_prologue> <body: func_epilogue> =>? {
         Ok(AstNode::Item(Item::Function {
             symbol,
             body,
         }))
     },
 };
+
+func_prologue: Rc<function::Symbol> = {
+    <metadata: start_func> "("<params: param_decl_list>")" BEGIN <locals: func_scoped_decl> =>? {
+        let func_name = metadata.0;
+        let return_type = metadata.1;
+
+        let symbol = function::Symbol::new(
+            func_name.clone(),
+            return_type,
+            params,
+            locals,
+        );
+
+        SymbolTable::add_function_symbol(symbol)
+        .or_else(|err| {
+            SymbolTable::add_symbol_error(err.clone());
+            Err(ParseError::User {
+                error: format!("Encountered declaration error: {:?}", err),
+            })
+        })?;
+
+        SymbolTable::function_symbol_for_name(&func_name)
+        .or_else(|err| {
+            SymbolTable::add_symbol_error(err.clone());
+            Err(ParseError::User {
+                error: format!("Unable to find specified function symbol: {:?}", err),
+            })
+        })
+    }
+}
+
+func_epilogue: Vec<Stmt> = {
+    <body: stmt_list> end_func => body,
+}
 
 start_func: (String, function::ReturnType) = {
     FUNCTION <return_type: any_type> <id:IDENTIFIER> => {
@@ -264,10 +269,6 @@ end_func: () = {
         scope::reset_stack_frame_local_slot_counter();
         scope::reset_stack_frame_param_slot_counter();
     },
-};
-
-func_body: (Vec<NumType>, Vec<Stmt>) = {
-    <locals: func_scoped_decl> <stmts: stmt_list> => (locals, stmts),
 };
 
 stmt_list: Vec<Stmt> = {
@@ -348,10 +349,9 @@ write_stmt: Stmt = {
     },
 };
 
-// TODO: Fixme!
 return_stmt: Stmt = {
     RETURN <expr> ";" => {
-        Stmt::None
+        Stmt::Return(<>)
     }
 };
 
@@ -463,17 +463,30 @@ postfix_expr: Expr = {
 };
 
 call_expr: Expr = {
-    IDENTIFIER "(" expr_list ")" => Expr::IntLiteral(42), // TODO: Fixme!
+    <func_name: IDENTIFIER> "(" <args: expr_list> ")" =>? {
+        let func_symbol = SymbolTable::function_symbol_for_name(func_name)
+        .or_else(|err| {
+            SymbolTable::add_symbol_error(err);
+            Err(ParseError::User {
+                error: "Unable to find specified function symbol!",
+            })
+        })?;
+
+        Ok(Expr::Call {
+            func_symbol,
+            args,
+        })
+    }
 };
 
-expr_list: () = {
-    expr expr_list_tail,
-    empty,
-};
-
-expr_list_tail: () = {
-    "," expr expr_list_tail,
-    empty,
+expr_list: Vec<Expr> = {
+    <mut expressions: (<expr>",")*> <expression: expr?> => match expression {
+        Some(expression) => {
+            expressions.push(expression);
+            expressions
+        },
+        None => expressions,
+    }
 };
 
 primary: Expr = {

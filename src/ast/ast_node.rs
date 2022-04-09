@@ -80,6 +80,10 @@ pub enum Expr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
+    Call {
+        func_symbol: Rc<function::Symbol>,
+        args: Vec<Expr>,
+    },
     None,
 }
 
@@ -119,8 +123,8 @@ pub enum Stmt {
         incr: Option<Assignment>,
         body: Vec<Stmt>,
     },
-    // TODO: Remove after RETURN statement is added
-    None
+    Return(Expr),
+    None,
 }
 
 /// Represents constructs in Microc
