@@ -1,10 +1,6 @@
-use derive_more::Display;
+use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType, TempF, TempI, FunctionIdent};
 
-use crate::three_addr_code_ir::{
-    BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType, TempF, TempI,
-};
-
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum ThreeAddressCode {
     #[display(fmt = "ADDI {} {} {}", lhs, rhs, temp_result)]
     AddI {
@@ -150,6 +146,28 @@ pub enum ThreeAddressCode {
         rhs: BinaryExprOperand,
         label: Label,
     },
+    #[display(fmt = "LABEL {}", "_0.name()")]
+    FunctionLabel(FunctionIdent),
+    #[display(fmt = "JSR {}", "_0.name()")]
+    Jsr(FunctionIdent),
+    #[display(fmt = "LINK")]
+    Link(FunctionIdent),
+    #[display(fmt = "RET")]
+    Ret,
+    #[display(fmt = "PUSH")]
+    PushEmpty,
+    #[display(fmt = "PUSH {}", _0)]
+    Push(BinaryExprOperand),
+    #[display(fmt = "POP")]
+    PopEmpty,
+    #[display(fmt = "POP {}", _0)]
+    PopI(LValueI),
+    #[display(fmt = "POP {}", _0)]
+    PopF(LValueF),
+    #[display(fmt = "STOREI {} $R", _0)]
+    StoreFuncReturnValI(BinaryExprOperand),
+    #[display(fmt = "STOREF {} $R", _0)]
+    StoreFuncReturnValF(BinaryExprOperand),
 }
 
 // TODO: Factor out all type checking into its own visitor.
@@ -159,15 +177,14 @@ pub mod visit {
         AddOp, Assignment, AstNode, CmpOp, Condition, Expr, Item, MulOp, Stmt,
     };
     use crate::symbol_table::symbol::data::DataType;
-    use crate::symbol_table::symbol::NumType;
+    use crate::symbol_table::symbol::{NumType, function};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
     };
-    use crate::three_addr_code_ir::{
-        BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI,
-    };
+    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI, FunctionIdent, reset_temp_counter};
     use typed_builder::TypedBuilder;
+    use crate::symbol_table::symbol::function::ReturnType;
 
     #[derive(Debug, Clone, TypedBuilder)]
     #[builder(field_defaults(default, setter(strip_option)))]
@@ -198,7 +215,7 @@ pub mod visit {
             match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
                 AstNode::Expr(expr) => self.visit_expression(expr),
-                _ => todo!(),
+                AstNode::Item(item) => self.visit_item(item),
             }
         }
     }
@@ -209,6 +226,25 @@ pub mod visit {
     //  have separated the traversal strategy into a separate method.
     // TODO: Can the Post-Order traversal of the AST be done iteratively?
     impl Visitor<CodeObject> for ThreeAddressCodeVisitor {
+        fn visit_item(&mut self, item: Item) -> CodeObject {
+            match item {
+                // TODO: Implement unit tests for 3AC code gen for functions
+                Item::Function { symbol, body } => {
+                    reset_temp_counter();
+                    let mut code_sequence = vec![];
+                    code_sequence.push(ThreeAddressCode::FunctionLabel(FunctionIdent(symbol.clone())));
+                    code_sequence.push(ThreeAddressCode::Link(FunctionIdent(symbol.clone())));
+                    let mut func_body = body
+                        .into_iter()
+                        .flat_map(|stmt| self.visit_statement(stmt).code_sequence)
+                        .collect();
+                    code_sequence.append(&mut func_body);
+
+                    CodeObject::builder().code_sequence(code_sequence).build()
+                }
+            }
+        }
+
         fn visit_statement(&mut self, stmt: Stmt) -> CodeObject {
             match stmt {
                 Stmt::Read(identifiers) => {
@@ -333,7 +369,31 @@ pub mod visit {
 
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
-                Stmt::Return(_) => todo!("Implement 3AC code gen for return statement"),
+                Stmt::Return(expr) => {
+                    let mut code_sequence = vec![];
+                    let mut expr_code_object = self.visit_expression(expr);
+                    code_sequence.append(&mut expr_code_object.code_sequence);
+
+                    // TODO: For call expressions the result can indeed be null. This
+                    // makes unwrapping the `result` field of expressions panic-prone
+                    // and unsafe, which we are doing at numerous places right now.
+                    if let CodeObject {
+                        result: Some(result),
+                        result_type: Some(result_type),
+                        ..
+                    } = expr_code_object {
+                        match result_type {
+                            ResultType::Int => code_sequence.push(ThreeAddressCode::StoreFuncReturnValI(result)),
+                            ResultType::Float => code_sequence.push(ThreeAddressCode::StoreFuncReturnValF(result)),
+                        }
+                    }
+
+                    code_sequence.push(ThreeAddressCode::Ret);
+
+                    CodeObject::builder()
+                        .code_sequence(code_sequence)
+                        .build()
+                },
                 Stmt::None => {
                     panic!("Invalid AST: AST statement node contains statement variant `None`.")
                 },
@@ -531,7 +591,74 @@ pub mod visit {
                         .code_sequence(left_code_seq)
                         .build()
                 }
-                Expr::Call { .. } => todo!("Implement 3AC code gen for call expression"),
+                Expr::Call { func_symbol, args } => {
+                    let mut code_sequence = vec![];
+                    let return_type = func_symbol.return_type();
+
+                    // Generate instructions to evaluate all function
+                    // parameters and add them to the existing code sequence.
+                    // Store the temporaries containing the results of the function
+                    // parameter expressions to set up the stack in preparation
+                    // for the function call.
+                    let num_args = args.len();
+                    let mut push_arg_instrs = args
+                        .into_iter()
+                        .map(|expr| {
+                            let mut expr_code_obj = self.visit_expression(expr);
+                            code_sequence.append(&mut expr_code_obj.code_sequence);
+                            // The result of a `CodeObject` returned
+                            // by an expression should never be `None`.
+                            // An expression should always evaluate to
+                            // a result with a strong type.
+                            expr_code_obj.result.unwrap()
+                        })
+                        .map(|arg| ThreeAddressCode::Push(arg))
+                        .collect();
+
+                    // If the function being called returns a value,
+                    // push empty slot for result of function.
+                    if return_type != function::ReturnType::Void {
+                        code_sequence.push(ThreeAddressCode::PushEmpty);
+                    }
+
+                    code_sequence.append(&mut push_arg_instrs);
+
+                    // Jump to target - current pc is pushed onto the stack as part of this instruction.
+                    // The pc pushed onto the stack should be popped off in the callee code.
+                    code_sequence.push(ThreeAddressCode::Jsr(FunctionIdent(func_symbol.clone())));
+
+                    // Pop all the function parameters
+                    (0..num_args).for_each(|_| code_sequence.push(ThreeAddressCode::PopEmpty));
+
+                    // If the function being called returns a value,
+                    // pop the function call result and store it in a temporary.
+                    let (result_register, result_type) = match return_type {
+                        ReturnType::Num(num_type) => match num_type {
+                            NumType::Int => {
+                                let result_register = TempI::new();
+                                code_sequence.push(ThreeAddressCode::PopI(LValueI::Temp(result_register)));
+                                (Some(result_register.into()), Some(ResultType::Int))
+                            },
+                            NumType::Float => {
+                                let result_register = TempF::new();
+                                code_sequence.push(ThreeAddressCode::PopF(LValueF::Temp(result_register)));
+                                (Some(result_register.into()), Some(ResultType::Float))
+                            },
+                        },
+                        ReturnType::Void => (None, None),
+                    };
+
+                    match return_type {
+                        ReturnType::Num(_) => CodeObject::builder()
+                            .result(result_register.unwrap())
+                            .result_type(result_type.unwrap())
+                            .code_sequence(code_sequence)
+                            .build(),
+                        ReturnType::Void => CodeObject::builder()
+                            .code_sequence(code_sequence)
+                            .build(),
+                    }
+                },
                 Expr::None => {
                     panic!("Invalid AST: AST expression node contains expression variant `None`.")
                 }

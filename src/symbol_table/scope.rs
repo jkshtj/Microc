@@ -18,7 +18,7 @@ pub fn reset_stack_frame_local_slot_counter() {
 }
 
 pub fn get_stack_frame_local_slot_counter() -> u32 {
-    STACK_FRAME_LOCAL_SLOT_COUNTER.load(Ordering::SeqCst)
+    STACK_FRAME_LOCAL_SLOT_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
 pub fn reset_stack_frame_param_slot_counter() {
@@ -26,7 +26,7 @@ pub fn reset_stack_frame_param_slot_counter() {
 }
 
 pub fn get_stack_frame_param_slot_counter() -> u32 {
-    STACK_FRAME_PARAM_SLOT_COUNTER.load(Ordering::SeqCst)
+    STACK_FRAME_PARAM_SLOT_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
 #[derive(Debug, Eq, PartialEq)]

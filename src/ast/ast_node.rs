@@ -158,8 +158,7 @@ pub mod visit {
     /// that can be generated from the AST
     /// representation of Microc.
     pub trait Visitor<T> {
-        // TODO: Uncomment to generate function code in 3AC.
-        // fn visit_item(&mut self, item: Item) -> T;
+        fn visit_item(&mut self, item: Item) -> T;
         fn visit_statement(&mut self, stmt: Stmt) -> T;
         fn visit_expression(&mut self, expr: Expr) -> T;
         fn visit_assignment(&mut self, assigment: Assignment) -> T;

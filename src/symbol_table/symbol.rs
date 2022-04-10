@@ -29,11 +29,11 @@ pub mod data {
     /// in the program to represent data - string, int or a float.
     #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
     pub enum NonFunctionScopedSymbol {
-        #[display(fmt = "name {} type STRING value {}\n", name, value)]
+        #[display(fmt = "{}", name)]
         String { name: String, value: String },
-        #[display(fmt = "name {} type INT\n", name)]
+        #[display(fmt = "{}", name)]
         Int { name: String },
-        #[display(fmt = "name {} type FLOAT\n", name)]
+        #[display(fmt = "{}", name)]
         Float { name: String },
     }
 
@@ -63,12 +63,12 @@ pub mod data {
     /// an int or a float.
     #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
     pub enum FunctionScopedSymbol {
-        #[display(fmt = "name: {}{} type INT\n", symbol_type, index)]
+        #[display(fmt = "${}{}", symbol_type, index)]
         Int {
             symbol_type: FunctionScopedSymbolType,
             index: u32,
         },
-        #[display(fmt = "name: {}{} type FLOAT\n", symbol_type, index)]
+        #[display(fmt = "${}{}", symbol_type, index)]
         Float {
             symbol_type: FunctionScopedSymbolType,
             index: u32,
@@ -109,6 +109,10 @@ pub mod function {
 
         pub fn name(&self) -> &str {
             &self.name
+        }
+
+        pub fn return_type(&self) -> ReturnType {
+            self.return_type
         }
     }
 }

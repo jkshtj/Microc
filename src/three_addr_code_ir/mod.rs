@@ -2,10 +2,8 @@
 //! Type checking should happen at this stage.
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use derive_more::Display;
-
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::symbol::data;
+use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
 
@@ -14,9 +12,16 @@ pub mod three_address_code;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
 static LABEL_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+/// Resets the count of temporaries used so far. The
+/// method is called once at the beginning of code gen
+/// for each new `Function`.
+pub fn reset_temp_counter() {
+    TEMP_COUNTER.store(1, Ordering::SeqCst);
+}
+
 /// Represents a point in the 3AC representation
 /// required to support control flow.
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, derive_more::Display, Copy, Clone, Eq, PartialEq, Hash)]
 #[display(fmt = "label{}", _0)]
 pub struct Label(u64);
 
@@ -32,7 +37,7 @@ impl Label {
 /// 3AC concept to represent int registers.
 /// There is no limit to the number
 /// of int temporaries that can be created.
-#[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
 pub struct TempI(u64);
 
@@ -45,7 +50,7 @@ impl TempI {
 /// 3AC concept to represent float registers.
 /// There is no limit to the number
 /// of flaot temporaries that can be created.
-#[derive(Debug, Copy, Clone, Display, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
 pub struct TempF(u64);
 
@@ -56,7 +61,7 @@ impl TempF {
 }
 
 /// Int identifier
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone)]
 pub struct IdentI(pub data::Symbol);
 
 impl From<Identifier> for IdentI {
@@ -66,7 +71,7 @@ impl From<Identifier> for IdentI {
 }
 
 /// Float identifier
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone)]
 pub struct IdentF(pub data::Symbol);
 
 impl From<Identifier> for IdentF {
@@ -76,7 +81,7 @@ impl From<Identifier> for IdentF {
 }
 
 /// String identifier
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone)]
 pub struct IdentS(pub data::Symbol);
 
 impl From<Identifier> for IdentS {
@@ -88,7 +93,7 @@ impl From<Identifier> for IdentS {
 /// Represents an int type LValue
 /// that can either be a temporary
 /// or an int identifier.
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum LValueI {
     Temp(TempI),
     #[display(fmt = "{}", _0)]
@@ -98,7 +103,7 @@ pub enum LValueI {
 /// Represents an float type LValue
 /// that can either be a temporary
 /// or an float identifier.
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum LValueF {
     Temp(TempF),
     #[display(fmt = "{}", _0)]
@@ -108,13 +113,13 @@ pub enum LValueF {
 /// Represents a RValue that can
 /// either be an int or a float
 /// literal.
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum RValue {
     IntLiteral(i32),
     FloatLiteral(f64),
 }
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum BinaryExprOperand {
     LValueI(LValueI),
     LValueF(LValueF),
@@ -204,5 +209,15 @@ impl From<data::DataType> for ResultType {
                 NumType::Float => ResultType::Float,
             },
         }
+    }
+}
+
+/// Function identifier
+#[derive(Debug, Clone)]
+pub struct FunctionIdent(pub Rc<function::Symbol>);
+
+impl FunctionIdent {
+    pub fn name(&self) -> &str {
+        self.0.name()
     }
 }

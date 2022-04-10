@@ -164,7 +164,7 @@ param_decl: NumType = {
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
             NumType::Int => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Int{
-                symbol_type: data::FunctionScopedSymbolType::Local,
+                symbol_type: data::FunctionScopedSymbolType::Parameter,
                 index: scope::get_stack_frame_param_slot_counter(),
             }),
         }.or_else(|err| {
@@ -213,7 +213,6 @@ func_scoped_var_decl: Vec<NumType> = {
 
 func_declarations: Vec<AstNode> = {
     <func_decl: func_decl> <mut func_declarations: func_declarations> => {
-        println!("{:?}", func_decl);
         func_declarations.push(func_decl);
         func_declarations
     },
@@ -260,7 +259,10 @@ func_prologue: Rc<function::Symbol> = {
 }
 
 func_epilogue: Vec<Stmt> = {
-    <body: stmt_list> end_func => body,
+    <mut body: stmt_list> end_func => {
+        body.reverse();
+        body
+    },
 }
 
 start_func: (String, function::ReturnType) = {

@@ -734,6 +734,7 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                     },
                 }
             }
+            _ => todo!("Add remaining 3AC variants."),
         }
     }
 }
