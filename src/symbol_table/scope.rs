@@ -1,14 +1,17 @@
-use crate::symbol_table::error::{DeclareExistingSymbolError, UseUndeclaredSymbolError, DeclareInInvalidScopeError, SymbolError, ScopeType};
+use crate::symbol_table::error::{
+    DeclareExistingSymbolError, DeclareInInvalidScopeError, ScopeType, SymbolError,
+    UseUndeclaredSymbolError,
+};
 use crate::symbol_table::symbol::data;
 use crate::symbol_table::symbol::function;
-use linked_hash_set::LinkedHashSet;
+use crate::symbol_table::SYMBOL_TABLE;
 use linked_hash_map::LinkedHashMap;
+use linked_hash_set::LinkedHashSet;
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
+use std::panic::panic_any;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
-use crate::symbol_table::SYMBOL_TABLE;
-use std::cell::RefCell;
-use std::panic::panic_any;
 
 static STACK_FRAME_LOCAL_SLOT_COUNTER: AtomicU32 = AtomicU32::new(1);
 static STACK_FRAME_PARAM_SLOT_COUNTER: AtomicU32 = AtomicU32::new(1);
@@ -108,24 +111,34 @@ impl Scope {
         }
     }
 
+    pub(crate) fn global_symbols(&self) -> Vec<Rc<data::NonFunctionScopedSymbol>> {
+        // TODO [rust type system]: Can I statically assert that
+        //  self is the `Global` variant of `Scope`?
+        match self {
+            Scope::Global { data_symbols, .. } => data_symbols.iter().cloned().collect(),
+            _ => panic!("`global_symbols` should not have been called for non-global scope!"),
+        }
+    }
+
     pub(crate) fn add_function_symbol(
         &mut self,
         symbol: function::Symbol,
     ) -> Result<(), SymbolError> {
-        // TODO: Can I statically assert that self is the `Global`
-        //  variant of type `Scope`?
+        // TODO [rust type system]: Can I statically assert that
+        //  self is the `Global` variant of `Scope`?
         if self.contains_function_symbol(&symbol) {
             return Err(SymbolError::DeclareExistingSymbol(
-                DeclareExistingSymbolError::new(
-                    self.name().to_owned(),
-                    symbol.name().to_owned(),
-                ))
-            );
+                DeclareExistingSymbolError::new(self.name().to_owned(), symbol.name().to_owned()),
+            ));
         }
 
         match self {
-            Scope::Global {function_symbols, ..} => function_symbols.insert(Rc::new(symbol)),
-            Scope::Anonymous { .. } | Scope::Function { .. } => unreachable!("A function symbol should never be added to a non-GLOBAL scope!"),
+            Scope::Global {
+                function_symbols, ..
+            } => function_symbols.insert(Rc::new(symbol)),
+            Scope::Anonymous { .. } | Scope::Function { .. } => {
+                unreachable!("A function symbol should never be added to a non-GLOBAL scope!")
+            }
         };
 
         Ok(())
@@ -137,11 +150,8 @@ impl Scope {
     ) -> Result<(), SymbolError> {
         if self.contains_non_func_scoped_symbol(&symbol) {
             return Err(SymbolError::DeclareExistingSymbol(
-                DeclareExistingSymbolError::new(
-                    self.name().to_owned(),
-                    symbol.name().to_owned(),
-                ))
-            );
+                DeclareExistingSymbolError::new(self.name().to_owned(), symbol.name().to_owned()),
+            ));
         }
 
         match self {
@@ -151,10 +161,12 @@ impl Scope {
                         self.name().to_owned(),
                         ScopeType::Function,
                         symbol.name().to_owned(),
-                    ))
-                );
+                    ),
+                ));
             }
-            Scope::Global { data_symbols, .. } | Scope::Anonymous { data_symbols, .. } => data_symbols.insert(Rc::new(symbol)),
+            Scope::Global { data_symbols, .. } | Scope::Anonymous { data_symbols, .. } => {
+                data_symbols.insert(Rc::new(symbol))
+            }
         };
 
         Ok(())
@@ -167,11 +179,8 @@ impl Scope {
     ) -> Result<(), SymbolError> {
         if self.contains_func_scoped_symbol(&name) {
             return Err(SymbolError::DeclareExistingSymbol(
-                DeclareExistingSymbolError::new(
-                    self.name().to_owned(),
-                    name,
-                ))
-            );
+                DeclareExistingSymbolError::new(self.name().to_owned(), name),
+            ));
         }
 
         match self {
@@ -183,17 +192,10 @@ impl Scope {
                 };
 
                 return Err(SymbolError::DeclareInInvalidSymbolScope(
-                    DeclareInInvalidScopeError::new(
-                        self.name().to_owned(),
-                        scope_type,
-                        name,
-                    ))
-                );
+                    DeclareInInvalidScopeError::new(self.name().to_owned(), scope_type, name),
+                ));
             }
-            Scope::Function {
-                data_symbols,
-                ..
-            } => data_symbols.insert(name, Rc::new(symbol)),
+            Scope::Function { data_symbols, .. } => data_symbols.insert(name, Rc::new(symbol)),
         };
         Ok(())
     }
@@ -211,22 +213,30 @@ impl Scope {
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map(|symbol| data::Symbol::NonFunctionScopedSymbol(symbol.clone()))
-                .ok_or(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-                    symbol_name.to_owned(),
-                ))),
-            Scope::Anonymous { data_symbols, parent, .. } => data_symbols
+                .ok_or(SymbolError::UseUndeclaredSymbol(
+                    UseUndeclaredSymbolError::new(symbol_name.to_owned()),
+                )),
+            Scope::Anonymous {
+                data_symbols,
+                parent,
+                ..
+            } => data_symbols
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map_or_else(
                     || parent.borrow().data_symbol_for_name(symbol_name),
-                    |symbol| Ok(data::Symbol::NonFunctionScopedSymbol(symbol.clone()))
+                    |symbol| Ok(data::Symbol::NonFunctionScopedSymbol(symbol.clone())),
                 ),
-            Scope::Function { data_symbols, parent, .. } => data_symbols
+            Scope::Function {
+                data_symbols,
+                parent,
+                ..
+            } => data_symbols
                 .iter()
                 .find(|&(name, symbol)| name == symbol_name)
                 .map_or_else(
                     || parent.borrow().data_symbol_for_name(symbol_name),
-                    |(name, symbol)| Ok(data::Symbol::FunctionScopedSymbol(symbol.clone()))
+                    |(name, symbol)| Ok(data::Symbol::FunctionScopedSymbol(symbol.clone())),
                 ),
         }
     }
@@ -242,24 +252,27 @@ impl Scope {
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map(|symbol| symbol.clone())
-                .ok_or(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-                    symbol_name.to_owned(),
-                ))),
-            Scope::Anonymous { .. } | Scope::Function { .. } => unreachable!("A function symbol should never be looked up in a non-GLOBAL scope!"),
+                .ok_or(SymbolError::UseUndeclaredSymbol(
+                    UseUndeclaredSymbolError::new(symbol_name.to_owned()),
+                )),
+            Scope::Anonymous { .. } | Scope::Function { .. } => {
+                unreachable!("A function symbol should never be looked up in a non-GLOBAL scope!")
+            }
         }
     }
 
     fn contains_non_func_scoped_symbol(&self, symbol: &data::NonFunctionScopedSymbol) -> bool {
         match self {
-            Scope::Global { data_symbols, .. }
-            | Scope::Anonymous { data_symbols, .. } => data_symbols.contains(symbol),
-            _ => false
+            Scope::Global { data_symbols, .. } | Scope::Anonymous { data_symbols, .. } => {
+                data_symbols.contains(symbol)
+            }
+            _ => false,
         }
     }
 
     fn contains_func_scoped_symbol(&self, name: &str) -> bool {
         match self {
-            Scope::Function {data_symbols, ..} => data_symbols.contains_key(name),
+            Scope::Function { data_symbols, .. } => data_symbols.contains_key(name),
             _ => false,
         }
     }
@@ -277,8 +290,7 @@ impl Scope {
     pub(crate) fn parent(&self) -> Rc<RefCell<Scope>> {
         match self {
             Scope::Global { .. } => panic!("Global scope does not have a parent!"),
-            Scope::Anonymous { parent, .. }
-            | Scope::Function { parent, .. } => Rc::clone(parent)
+            Scope::Anonymous { parent, .. } | Scope::Function { parent, .. } => Rc::clone(parent),
         }
     }
 }
@@ -286,9 +298,9 @@ impl Scope {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::symbol_table::symbol::function::ReturnType;
     use crate::symbol_table::error::ScopeType::Anonymous;
     use crate::symbol_table::symbol::data::FunctionScopedSymbolType;
+    use crate::symbol_table::symbol::function::ReturnType;
 
     #[test]
     fn scope_name_set_correctly() {
@@ -302,37 +314,35 @@ mod test {
 
     #[test]
     fn add_func_symbol_under_invalid_scope_returns_invalid_scope_declaration_error() {
-        let symbol = function::Symbol::new(
-            "some_func".to_owned(),
-            ReturnType::Void,
-            vec![],
-            vec![],
-        );
+        let symbol =
+            function::Symbol::new("some_func".to_owned(), ReturnType::Void, vec![], vec![]);
 
         let global = Rc::new(RefCell::new(Scope::new_global()));
         let mut anonymous = Scope::new_anonymous("Anonymous", global);
-        assert_eq!(SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
-            "Anonymous".to_owned(),
-            ScopeType::Anonymous,
-            "some_func".to_string()
-            )), anonymous.add_function_symbol(symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
+                "Anonymous".to_owned(),
+                ScopeType::Anonymous,
+                "some_func".to_string()
+            )),
+            anonymous.add_function_symbol(symbol).unwrap_err()
+        );
     }
 
     #[test]
     fn add_existing_func_symbol_under_valid_scope_returns_symbol_redeclaration_error() {
-        let symbol = function::Symbol::new(
-            "some_func".to_owned(),
-            ReturnType::Void,
-            vec![],
-            vec![],
-        );
+        let symbol =
+            function::Symbol::new("some_func".to_owned(), ReturnType::Void, vec![], vec![]);
 
         let mut global = Scope::new_global();
         global.add_function_symbol(symbol.clone());
-        assert_eq!(SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
-            "GLOBAL".to_owned(),
-            "some_func".to_string()
-        )), global.add_function_symbol(symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
+                "GLOBAL".to_owned(),
+                "some_func".to_string()
+            )),
+            global.add_function_symbol(symbol).unwrap_err()
+        );
     }
 
     #[test]
@@ -342,11 +352,14 @@ mod test {
         };
         let global = Rc::new(RefCell::new(Scope::new_global()));
         let mut function = Scope::new_function("Function", global);
-        assert_eq!(SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
-            "Function".to_owned(),
-            ScopeType::Function,
-            "symbol".to_string()
-        )), function.add_non_func_scoped_symbol(symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
+                "Function".to_owned(),
+                ScopeType::Function,
+                "symbol".to_string()
+            )),
+            function.add_non_func_scoped_symbol(symbol).unwrap_err()
+        );
     }
 
     #[test]
@@ -357,10 +370,13 @@ mod test {
 
         let mut global = Scope::new_global();
         global.add_non_func_scoped_symbol(symbol.clone());
-        assert_eq!(SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
-            "GLOBAL".to_owned(),
-            "symbol".to_string()
-        )), global.add_non_func_scoped_symbol(symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
+                "GLOBAL".to_owned(),
+                "symbol".to_string()
+            )),
+            global.add_non_func_scoped_symbol(symbol).unwrap_err()
+        );
     }
 
     #[test]
@@ -371,11 +387,16 @@ mod test {
         };
         let global = Rc::new(RefCell::new(Scope::new_global()));
         let mut anonymous = Scope::new_anonymous("Anonymous", global);
-        assert_eq!(SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
-            "Anonymous".to_owned(),
-            ScopeType::Anonymous,
-            "symbol".to_string()
-        )), anonymous.add_func_scoped_symbol("symbol".to_owned(), symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareInInvalidSymbolScope(DeclareInInvalidScopeError::new(
+                "Anonymous".to_owned(),
+                ScopeType::Anonymous,
+                "symbol".to_string()
+            )),
+            anonymous
+                .add_func_scoped_symbol("symbol".to_owned(), symbol)
+                .unwrap_err()
+        );
     }
 
     #[test]
@@ -388,10 +409,15 @@ mod test {
         let global = Rc::new(RefCell::new(Scope::new_global()));
         let mut function = Scope::new_function("Function", global);
         function.add_func_scoped_symbol("symbol".to_owned(), symbol.clone());
-        assert_eq!(SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
-            "Function".to_owned(),
-            "symbol".to_string()
-        )), function.add_func_scoped_symbol("symbol".to_owned(), symbol).unwrap_err());
+        assert_eq!(
+            SymbolError::DeclareExistingSymbol(DeclareExistingSymbolError::new(
+                "Function".to_owned(),
+                "symbol".to_string()
+            )),
+            function
+                .add_func_scoped_symbol("symbol".to_owned(), symbol)
+                .unwrap_err()
+        );
     }
 
     #[test]
@@ -402,7 +428,10 @@ mod test {
         let mut global = Scope::new_global();
         global.add_non_func_scoped_symbol(symbol.clone());
         let symbol = Rc::new(symbol);
-        matches!(global.data_symbol_for_name("symbol").unwrap(), data::Symbol::NonFunctionScopedSymbol(symbol));
+        matches!(
+            global.data_symbol_for_name("symbol").unwrap(),
+            data::Symbol::NonFunctionScopedSymbol(symbol)
+        );
     }
 
     #[test]
@@ -411,9 +440,10 @@ mod test {
             name: "symbol".to_owned(),
         };
         let mut global = Scope::new_global();
-        assert_eq!(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-            "symbol".to_owned()
-        )), global.data_symbol_for_name("symbol").unwrap_err());
+        assert_eq!(
+            SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new("symbol".to_owned())),
+            global.data_symbol_for_name("symbol").unwrap_err()
+        );
     }
 
     #[test]
@@ -426,7 +456,10 @@ mod test {
         let mut function = Scope::new_function("Function", global);
         function.add_func_scoped_symbol("symbol".to_owned(), symbol.clone());
         let symbol = Rc::new(symbol);
-        matches!(function.data_symbol_for_name("symbol").unwrap(), data::Symbol::FunctionScopedSymbol(symbol));
+        matches!(
+            function.data_symbol_for_name("symbol").unwrap(),
+            data::Symbol::FunctionScopedSymbol(symbol)
+        );
     }
 
     #[test]
@@ -437,11 +470,11 @@ mod test {
         };
         let global = Rc::new(RefCell::new(Scope::new_global()));
         let mut function = Scope::new_function("Function", global);
-        assert_eq!(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-            "symbol".to_owned()
-        )), function.data_symbol_for_name("symbol").unwrap_err());
+        assert_eq!(
+            SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new("symbol".to_owned())),
+            function.data_symbol_for_name("symbol").unwrap_err()
+        );
     }
-
 
     #[test]
     fn data_symbol_for_name_looks_recursively_through_scope_hierarchy() {
@@ -452,38 +485,39 @@ mod test {
         let global = Rc::new(RefCell::new(Scope::new_global()));
 
         // Symbol is added under the global scope
-        global.borrow_mut().add_non_func_scoped_symbol(symbol.clone());
+        global
+            .borrow_mut()
+            .add_non_func_scoped_symbol(symbol.clone());
 
         let mut function = Scope::new_function("Function", global);
         let symbol = Rc::new(symbol);
         // Yet it will be resolvable from a function scope which is a child of the global scope
-        matches!(function.data_symbol_for_name("symbol").unwrap(), data::Symbol::NonFunctionScopedSymbol(symbol));
+        matches!(
+            function.data_symbol_for_name("symbol").unwrap(),
+            data::Symbol::NonFunctionScopedSymbol(symbol)
+        );
     }
 
     #[test]
     fn func_symbol_for_name_returns_symbol_when_symbol_and_scope_valid() {
-        let symbol = function::Symbol::new(
-            "some_func".to_owned(),
-            ReturnType::Void,
-            vec![],
-            vec![],
-        );
+        let symbol =
+            function::Symbol::new("some_func".to_owned(), ReturnType::Void, vec![], vec![]);
         let mut global = Scope::new_global();
         global.add_function_symbol(symbol.clone());
-        assert_eq!(symbol, *global.function_symbol_for_name("some_func").unwrap());
+        assert_eq!(
+            symbol,
+            *global.function_symbol_for_name("some_func").unwrap()
+        );
     }
 
     #[test]
     fn func_symbol_for_name_returns_undeclared_symbol_error_when_symbol_undeclared() {
-        let symbol = function::Symbol::new(
-            "some_func".to_owned(),
-            ReturnType::Void,
-            vec![],
-            vec![],
-        );
+        let symbol =
+            function::Symbol::new("some_func".to_owned(), ReturnType::Void, vec![], vec![]);
         let mut global = Scope::new_global();
-        assert_eq!(SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
-            "some_func".to_owned()
-        )), global.function_symbol_for_name("some_func").unwrap_err());
+        assert_eq!(
+            SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new("some_func".to_owned())),
+            global.function_symbol_for_name("some_func").unwrap_err()
+        );
     }
 }

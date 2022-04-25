@@ -1,7 +1,7 @@
 use crate::symbol_table::scope::Scope;
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-use std::cell::RefCell;
 
 /// A tree like structure for representing
 /// scopes. Each scope uses one table of
@@ -60,5 +60,5 @@ impl ScopeTree {
 
 #[cfg(test)]
 mod test {
-    // TODO: Add unit tests
+    // TODO [unit tests]: Add unit tests
 }

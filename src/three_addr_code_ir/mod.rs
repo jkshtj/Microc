@@ -3,8 +3,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ast::ast_node::Identifier;
-use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::symbol::NumType;
+use crate::symbol_table::symbol::{data, function};
 use std::rc::Rc;
 
 pub mod three_address_code;
@@ -190,8 +190,6 @@ impl From<RValue> for BinaryExprOperand {
     }
 }
 
-// TODO: Move this to common types if there is a
-//  use case outside of 3AC.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ResultType {
     Int,

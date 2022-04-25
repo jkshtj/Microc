@@ -2,14 +2,14 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use atomic_refcell::AtomicRefCell;
-use derive_more::Display;
-
-use crate::symbol_table::symbol::data;
+use crate::symbol_table::symbol::data::{FunctionScopedSymbol, NonFunctionScopedSymbol, Symbol};
+use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
+use atomic_refcell::AtomicRefCell;
+use std::fmt::Formatter;
 use std::rc::Rc;
 
 static REGISTER_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -19,7 +19,7 @@ lazy_static::lazy_static! {
     static ref FLOAT_REGISTER_MAP: AtomicRefCell<HashMap<TempF, Register>> = AtomicRefCell::new(HashMap::new());
 }
 
-#[derive(Debug, Copy, Clone, Display)]
+#[derive(Debug, Copy, Clone, derive_more::Display)]
 #[display(fmt = "label{}", _0)]
 pub struct Label(u64);
 
@@ -29,14 +29,14 @@ impl From<three_addr_code_ir::Label> for Label {
     }
 }
 
-#[derive(Debug, Copy, Clone, Display)]
+#[derive(Debug, Copy, Clone, derive_more::Display)]
 #[display(fmt = "r{}", _0)]
 pub struct Register(u64);
 
 impl Register {
     pub fn new() -> Self {
         let result = REGISTER_COUNTER.fetch_add(1, Ordering::SeqCst);
-        // TODO: Add proper error type
+        // TODO [better errors]: Add proper error type
         assert!(result < 200, "Cannot allocate more than 200 registers!");
         Self(result)
     }
@@ -44,15 +44,58 @@ impl Register {
 
 /// Memory id, stack variable, or a register
 /// https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone)]
 pub enum Opmr {
     Reg(Register),
     Id(data::Symbol),
 }
 
+// Using hand written impl for display for Opmr
+// because we need to name the function scoped symbols,
+// i.e., function parameters and local variables,
+// as positive/negative offsets to the frame pointer.
+impl std::fmt::Display for Opmr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Opmr::Reg(register) => {
+                write!(f, "{}", register)
+            }
+            Opmr::Id(id) => {
+                match id {
+                    Symbol::NonFunctionScopedSymbol(symbol) => {
+                        write!(f, "{}", symbol)
+                    }
+                    Symbol::FunctionScopedSymbol(symbol) => {
+                        match **symbol {
+                            data::FunctionScopedSymbol::Int {
+                                symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                                index,
+                            }
+                            | data::FunctionScopedSymbol::Float {
+                                symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                                index,
+                            } => {
+                                write!(
+                                    f,
+                                    "${}",
+                                    num_params as u32 - index + 1 + 1 /* for return address block on stack */
+                                )
+                            }
+                            data::FunctionScopedSymbol::Int { index, .. }
+                            | data::FunctionScopedSymbol::Float { index, .. } => {
+                                write!(f, "$-{}", index)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Memory id, stack variable, register or an int literal
 /// https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum OpmrIL {
     Literal(i32),
     Location(Opmr),
@@ -60,7 +103,7 @@ pub enum OpmrIL {
 
 /// Memory id, stack variable, register or a float literal
 /// https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum OpmrFL {
     Literal(f64),
     Location(Opmr),
@@ -68,7 +111,7 @@ pub enum OpmrFL {
 
 /// Memory id, stack variable, register or a number (literal)
 /// https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum OpmrL {
     Int(OpmrIL),
     Float(OpmrFL),
@@ -90,7 +133,7 @@ impl OpmrL {
     }
 }
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 #[display(fmt = "{} {}", id, value)]
 pub struct Sid {
     id: String,
@@ -98,7 +141,7 @@ pub struct Sid {
 }
 
 #[allow(unused)]
-#[derive(Debug, Display)]
+#[derive(Debug, derive_more::Display)]
 pub enum TinyCode {
     #[display(fmt = "var {}", _0)]
     Var(String),
@@ -132,18 +175,6 @@ pub enum TinyCode {
     CmpI(OpmrIL, Register),
     #[display(fmt = "cmpr {} {}", _0, _1)]
     CmpF(OpmrFL, Register),
-    #[display(fmt = "PUSH - FIXME")]
-    Push(Option<OpmrL>),
-    #[display(fmt = "POP - FIXME")]
-    Pop(Option<Opmr>),
-    #[display(fmt = "jsr {}", _0)]
-    Jsr(Label),
-    #[display(fmt = "RET - FIXME")]
-    Ret,
-    #[display(fmt = "LINK - FIXME")]
-    Link(Option<u32>),
-    #[display(fmt = "UNLINK - FIXME")]
-    Unlink,
     #[display(fmt = "jmp {}", _0)]
     Jmp(Label),
     #[display(fmt = "jgt {}", _0)]
@@ -168,8 +199,30 @@ pub enum TinyCode {
     WriteF(Opmr),
     #[display(fmt = "sys writes {}", _0)]
     WriteS(data::Symbol),
+    #[display(fmt = "push")]
+    PushEmpty,
+    #[display(fmt = "push {}", _0)]
+    Push(OpmrL),
+    #[display(fmt = "pop")]
+    PopEmpty,
+    #[display(fmt = "pop {}", _0)]
+    Pop(Opmr),
+    #[display(fmt = "label {}", "_0.name()")]
+    FunctionLabel(Rc<function::Symbol>),
+    #[display(fmt = "jsr {}", "_0.name()")]
+    Jsr(Rc<function::Symbol>),
+    #[display(fmt = "ret")]
+    Ret,
+    #[display(fmt = "link")]
+    LinkEmpty,
+    #[display(fmt = "link {}", _0)]
+    Link(usize),
+    #[display(fmt = "unlnk")]
+    Unlink,
     #[display(fmt = "sys halt")]
     Halt,
+    #[display(fmt = "end")]
+    End,
 }
 
 impl TinyCode {
@@ -260,6 +313,7 @@ impl TinyCode {
         }
     }
 
+    // TODO [idiomatic rust]: Can this be changed to TryFrom impls
     fn binary_op_tac_operand_to_opmrl(operand: BinaryExprOperand) -> OpmrL {
         match operand {
             BinaryExprOperand::LValueI(lval) => match lval {
@@ -375,9 +429,12 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
             ThreeAddressCode::StoreI { lhs, rhs } => {
                 // NOTE - Only 1 of the move operands can be a memory ref.
                 // The other has to be stored in a register.
+                // https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
 
                 let (operand1, is_lhs_mem_ref) = match lhs {
                     LValueI::Temp(temp) => {
+                        // TODO [assumption]: An existing temporary may be reused.
+                        //  I will know more after figuring our register allocation.
                         let maybe_new_register = INT_REGISTER_MAP
                             .borrow()
                             .get(&temp)
@@ -494,8 +551,14 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::StoreF { lhs, rhs } => {
+                // NOTE - Only 1 of the move operands can be a memory ref.
+                // The other has to be stored in a register.
+                // https://engineering.purdue.edu/~milind/ece468/2017fall/assignments/step4/tinyDoc.txt
+
                 let (operand1, is_lhs_mem_ref) = match lhs {
                     LValueF::Temp(temp) => {
+                        // TODO [assumption]: An existing temporary may be reused.
+                        //  I will know more after figuring our register allocation.
                         let maybe_new_register = FLOAT_REGISTER_MAP
                             .borrow()
                             .get(&temp)
@@ -734,37 +797,123 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                     },
                 }
             }
-            _ => todo!("Add remaining 3AC variants."),
+            ThreeAddressCode::PushEmpty => TinyCodeSequence {
+                sequence: vec![TinyCode::PushEmpty],
+            },
+            ThreeAddressCode::Push(operand) => TinyCodeSequence {
+                sequence: vec![TinyCode::Push(TinyCode::binary_op_tac_operand_to_opmrl(
+                    operand,
+                ))],
+            },
+            ThreeAddressCode::PopEmpty => TinyCodeSequence {
+                sequence: vec![TinyCode::PopEmpty],
+            },
+            ThreeAddressCode::PopI(lvalue) => {
+                match lvalue {
+                    LValueI::Temp(temp) => {
+                        // TODO [assumption]: An existing temporary may be reused.
+                        //  I will know more after figuring our register allocation.
+                        let maybe_new_register = INT_REGISTER_MAP
+                            .borrow()
+                            .get(&temp)
+                            .copied()
+                            .unwrap_or_else(Register::new);
+                        INT_REGISTER_MAP
+                            .borrow_mut()
+                            .insert(temp, maybe_new_register);
+
+                        TinyCodeSequence {
+                            sequence: vec![TinyCode::Pop(Opmr::Reg(maybe_new_register))],
+                        }
+                    }
+                    LValueI::Id(id) => TinyCodeSequence {
+                        sequence: vec![TinyCode::Pop(Opmr::Id(id.0))],
+                    },
+                }
+            }
+            ThreeAddressCode::PopF(lvalue) => {
+                match lvalue {
+                    LValueF::Temp(temp) => {
+                        // TODO [assumption]: An existing temporary may be reused.
+                        //  I will know more after figuring our register allocation.
+                        let maybe_new_register = FLOAT_REGISTER_MAP
+                            .borrow()
+                            .get(&temp)
+                            .copied()
+                            .unwrap_or_else(Register::new);
+                        FLOAT_REGISTER_MAP
+                            .borrow_mut()
+                            .insert(temp, maybe_new_register);
+
+                        TinyCodeSequence {
+                            sequence: vec![TinyCode::Pop(Opmr::Reg(maybe_new_register))],
+                        }
+                    }
+                    LValueF::Id(id) => TinyCodeSequence {
+                        sequence: vec![TinyCode::Pop(Opmr::Id(id.0))],
+                    },
+                }
+            }
+            ThreeAddressCode::FunctionLabel(symbol) => TinyCodeSequence {
+                sequence: vec![TinyCode::FunctionLabel(symbol.0)],
+            },
+            ThreeAddressCode::Jsr(symbol) => TinyCodeSequence {
+                sequence: vec![TinyCode::Jsr(symbol.0)],
+            },
+            ThreeAddressCode::Link(symbol) => {
+                let num_locals = symbol.0.num_locals();
+                let link = if num_locals > 0 {
+                    TinyCode::Link(num_locals)
+                } else {
+                    TinyCode::LinkEmpty
+                };
+
+                TinyCodeSequence {
+                    sequence: vec![link],
+                }
+            }
+            ThreeAddressCode::Ret => TinyCodeSequence {
+                sequence: vec![TinyCode::Unlink, TinyCode::Ret],
+            },
         }
     }
 }
 
 impl From<Vec<ThreeAddressCode>> for TinyCodeSequence {
     fn from(three_adr_code_seq: Vec<ThreeAddressCode>) -> Self {
-        // // Add all symbol declarations to tiny code sequence
-        // let symbol_decls = SymbolTable::seal()
-        //     .into_iter()
-        //     .map(|symbol| match symbol {
-        //         DataSymbol::String { name, value } => TinyCode::Str(Sid { id: name, value }),
-        //         DataSymbol::Int { name } => TinyCode::Var(name),
-        //         DataSymbol::Float { name } => TinyCode::Var(name),
-        //     })
-        //     .collect();
-        //
-        // let mut result = TinyCodeSequence {
-        //     sequence: symbol_decls,
-        // };
-        //
-        // result.sequence.extend(
-        //     three_adr_code_seq
-        //         .into_iter()
-        //         .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence),
-        // );
-        //
-        // result.sequence.push(TinyCode::Halt);
+        // Add all symbol declarations to tiny code sequence
+        let symbol_decls = SymbolTable::global_symbols()
+            .into_iter()
+            .map(|symbol| match &*symbol {
+                NonFunctionScopedSymbol::String { name, value } => TinyCode::Str(Sid {
+                    id: name.clone(),
+                    value: value.clone(),
+                }),
+                NonFunctionScopedSymbol::Int { name } => TinyCode::Var(name.clone()),
+                NonFunctionScopedSymbol::Float { name } => TinyCode::Var(name.clone()),
+            })
+            .collect();
 
-        TinyCodeSequence {
-            sequence: vec![], // result.sequence,
-        }
+        let mut result = TinyCodeSequence {
+            sequence: symbol_decls,
+        };
+
+        // Insert empty slot for result of `main` and then a
+        // call to `main` itself.
+        let main_func_symbol =
+            SymbolTable::function_symbol_for_name("main").expect("No `main` function found!");
+        result.sequence.push(TinyCode::PushEmpty);
+        result.sequence.push(TinyCode::Jsr(main_func_symbol));
+        result.sequence.push(TinyCode::Halt);
+
+        result.sequence.extend(
+            three_adr_code_seq
+                .into_iter()
+                .flat_map(|code| Into::<TinyCodeSequence>::into(code).sequence),
+        );
+
+        result.sequence.push(TinyCode::End);
+
+        result
     }
 }

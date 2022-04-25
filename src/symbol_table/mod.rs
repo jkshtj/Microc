@@ -42,6 +42,13 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
+    pub fn global_symbols() -> Vec<Rc<data::NonFunctionScopedSymbol>> {
+        SYMBOL_TABLE.with(|symbol_table| {
+            let scope_tree = &symbol_table.borrow().scope_tree;
+            scope_tree.global_scope().borrow().global_symbols()
+        })
+    }
+
     pub fn add_symbol_error(error: SymbolError) {
         SYMBOL_TABLE.with(|symbol_table| {
             symbol_table.borrow_mut().symbol_errors.push(error);
@@ -78,52 +85,72 @@ impl SymbolTable {
         })
     }
 
-    // TODO: add relevant unit tests
-    pub fn add_non_func_scoped_symbol(symbol: data::NonFunctionScopedSymbol) -> Result<(), SymbolError> {
+    // TODO [unit tests]: add relevant unit tests
+    pub fn add_non_func_scoped_symbol(
+        symbol: data::NonFunctionScopedSymbol,
+    ) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope();
-            active_scope.borrow_mut().add_non_func_scoped_symbol(symbol)?;
+            active_scope
+                .borrow_mut()
+                .add_non_func_scoped_symbol(symbol)?;
             Ok(())
         })
     }
 
-    // TODO: add relevant unit tests
-    pub fn add_func_scoped_symbol(name: String, symbol: data::FunctionScopedSymbol) -> Result<(), SymbolError> {
+    // TODO [unit tests]: add relevant unit tests
+    pub fn add_func_scoped_symbol(
+        name: String,
+        symbol: data::FunctionScopedSymbol,
+    ) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             let active_scope = scope_tree.active_scope();
-            active_scope.borrow_mut().add_func_scoped_symbol(name, symbol)?;
+            active_scope
+                .borrow_mut()
+                .add_func_scoped_symbol(name, symbol)?;
             Ok(())
         })
     }
 
-    // TODO: add relevant unit tests
+    // TODO [unit tests]: add relevant unit tests
     pub fn add_function_symbol(symbol: function::Symbol) -> Result<(), SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &mut symbol_table.borrow_mut().scope_tree;
             // Functions can only be declared in global scope
-            scope_tree.global_scope().borrow_mut().add_function_symbol(symbol)?;
+            scope_tree
+                .global_scope()
+                .borrow_mut()
+                .add_function_symbol(symbol)?;
             Ok(())
         })
     }
 
-    // TODO: add relevant unit tests
+    // TODO [unit tests]: add relevant unit tests
     pub fn data_symbol_for_name(symbol_name: &str) -> Result<data::Symbol, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            Ok(scope_tree.active_scope().borrow().data_symbol_for_name(symbol_name)?)
+            Ok(scope_tree
+                .active_scope()
+                .borrow()
+                .data_symbol_for_name(symbol_name)?)
         })
     }
 
-    // TODO: add relevant unit tests
-    pub fn function_symbol_for_name(symbol_name: &str) -> Result<Rc<function::Symbol>, SymbolError> {
+    // TODO [unit tests]: add relevant unit tests
+    pub fn function_symbol_for_name(
+        symbol_name: &str,
+    ) -> Result<Rc<function::Symbol>, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
             // Functions are only declared in global scope and
             // therefore it makes sense to only look for them
             // in the global scope.
-            Ok(scope_tree.global_scope().borrow().function_symbol_for_name(symbol_name)?)
+            Ok(scope_tree
+                .global_scope()
+                .borrow()
+                .function_symbol_for_name(symbol_name)?)
         })
     }
 
@@ -264,7 +291,7 @@ mod test {
 
     #[test]
     #[serial]
-    // TODO: Test needs to be updated to reflect changes in
+    // TODO [unit tests]: Test needs to be updated to reflect changes in
     // FunctionScope and take into account the addition of
     // the FunctionDataSymbol type
     fn add_symbol_works() {
@@ -309,6 +336,8 @@ mod test {
             value: "value1".to_owned(),
         };
         SymbolTable::add_non_func_scoped_symbol(symbol.clone());
-        assert!(SymbolTable::add_non_func_scoped_symbol(symbol).err().is_some());
+        assert!(SymbolTable::add_non_func_scoped_symbol(symbol)
+            .err()
+            .is_some());
     }
 }

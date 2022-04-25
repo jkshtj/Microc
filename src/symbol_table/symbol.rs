@@ -51,8 +51,12 @@ pub mod data {
     /// symbol - parameter or local
     #[derive(Debug, Eq, Clone, PartialEq, Hash, derive_more::Display)]
     pub enum FunctionScopedSymbolType {
+        /// The parameter variant stores the total number
+        /// of parameters in this function. This data is needed
+        /// during code gen to figure out the offset that is to
+        /// be used to access each parameter.
         #[display(fmt = "P")]
-        Parameter,
+        Parameter(usize /* total number of params*/),
         #[display(fmt = "L")]
         Local,
     }
@@ -89,7 +93,8 @@ pub mod function {
 
     /// Represents function or non-data
     /// symbols in the program.
-    #[derive(Debug, PartialEq, Clone, Hash, Eq)]
+    #[derive(Debug, PartialEq, Clone, Hash, Eq, derive_more::Display)]
+    #[display(fmt = "{}", name)]
     pub struct Symbol {
         name: String,
         return_type: ReturnType,
@@ -98,7 +103,12 @@ pub mod function {
     }
 
     impl Symbol {
-        pub fn new(name: String, return_type: ReturnType, params: Vec<NumType>, locals: Vec<NumType>) -> Self {
+        pub fn new(
+            name: String,
+            return_type: ReturnType,
+            params: Vec<NumType>,
+            locals: Vec<NumType>,
+        ) -> Self {
             Self {
                 name,
                 return_type,
@@ -113,6 +123,10 @@ pub mod function {
 
         pub fn return_type(&self) -> ReturnType {
             self.return_type
+        }
+
+        pub fn num_locals(&self) -> usize {
+            self.locals.len()
         }
     }
 }

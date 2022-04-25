@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 grammar;
 
-// TODO: Create a more elaborate error type that
+// TODO [better errors]: Create a more elaborate error type that
 //  is representative of the error domain for
 //  parsing in microc.
 extern {
@@ -146,7 +146,7 @@ id_list: Vec<&'input str> = {
     },
 };
 
-param_decl_list: Vec<NumType> = {
+param_decl_list: Vec<(NumType, String)> = {
     <mut params: (<param_decl> ",")*> <param: param_decl?> => match param {
             Some(param) => {
                 params.push(param);
@@ -156,26 +156,8 @@ param_decl_list: Vec<NumType> = {
     },
 }
 
-param_decl: NumType = {
-    <ty:var_type> <id:IDENTIFIER> =>? {
-        match ty {
-            NumType::Float => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Float{
-                symbol_type: data::FunctionScopedSymbolType::Parameter,
-                index: scope::get_stack_frame_param_slot_counter(),
-            }),
-            NumType::Int => SymbolTable::add_func_scoped_symbol(id.to_owned(), data::FunctionScopedSymbol::Int{
-                symbol_type: data::FunctionScopedSymbolType::Parameter,
-                index: scope::get_stack_frame_param_slot_counter(),
-            }),
-        }.or_else(|err| {
-            SymbolTable::add_symbol_error(err.clone());
-            Err(ParseError::User {
-                error: format!("Encountered declaration error: {:?}", err),
-            })
-        })?;
-
-        Ok(ty)
-    },
+param_decl: (NumType, String) = {
+    <ty:var_type> <id:IDENTIFIER> => (ty, id.to_owned()),
 };
 
 func_scoped_decl: Vec<NumType> = {
@@ -232,11 +214,57 @@ func_prologue: Rc<function::Symbol> = {
     <metadata: start_func> "("<params: param_decl_list>")" BEGIN <locals: func_scoped_decl> =>? {
         let func_name = metadata.0;
         let return_type = metadata.1;
+        let mut num_params = params.len();
+
+        if let function::ReturnType::Num(ty) = return_type {
+            // If function's return type is not void, i.e., its return
+            // type is either INT or FLOAT, create a function scoped symbol
+            // that the function will later populate as part of "returning" a value.
+            // The return value is essentially being treated as a function parameter.
+            num_params += 1;
+
+            match ty {
+                NumType::Float => SymbolTable::add_func_scoped_symbol("$R".to_owned(), data::FunctionScopedSymbol::Float{
+                    symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                    index: scope::get_stack_frame_param_slot_counter(),
+                }),
+                NumType::Int => SymbolTable::add_func_scoped_symbol("$R".to_owned(), data::FunctionScopedSymbol::Int{
+                    symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                    index: scope::get_stack_frame_param_slot_counter(),
+                }),
+            }.or_else(|err| {
+                SymbolTable::add_symbol_error(err.clone());
+                Err(ParseError::User {
+                    error: format!("Encountered declaration error: {:?}", err),
+                })
+            })?;
+        }
+
+        let mut param_types = vec![];
+        for (ty, id) in params {
+            match ty {
+                NumType::Float => SymbolTable::add_func_scoped_symbol(id, data::FunctionScopedSymbol::Float{
+                    symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                    index: scope::get_stack_frame_param_slot_counter(),
+                }),
+                NumType::Int => SymbolTable::add_func_scoped_symbol(id, data::FunctionScopedSymbol::Int{
+                    symbol_type: data::FunctionScopedSymbolType::Parameter(num_params),
+                    index: scope::get_stack_frame_param_slot_counter(),
+                }),
+            }.or_else(|err| {
+                SymbolTable::add_symbol_error(err.clone());
+                Err(ParseError::User {
+                    error: format!("Encountered declaration error: {:?}", err),
+                })
+            })?;
+
+            param_types.push(ty);
+        }
 
         let symbol = function::Symbol::new(
             func_name.clone(),
             return_type,
-            params,
+            param_types,
             locals,
         );
 
@@ -359,8 +387,30 @@ write_stmt: Stmt = {
 };
 
 return_stmt: Stmt = {
-    RETURN <expr> ";" => {
-        Stmt::Return(<>)
+    // Return statements can only appear as the last statement of
+    // functions. In the syntax-directed translation of our functions
+    // we make sure to create a symbol named "return_value" as the
+    // first parameter to that function, if the function does return a
+    // non-VOID result. Therefore here in the return statement we should
+    // be able to expect this "return_value" symbol to already be present
+    // in the function's scope.
+    RETURN <return_expr: expr> ";" =>? {
+        let symbol = SymbolTable::data_symbol_for_name("$R")
+            .or_else(|err| {
+                SymbolTable::add_symbol_error(err.clone());
+                Err(ParseError::User {
+                    error: "Function has a return statement but no `$R` symbol was found in the function's scope!".to_owned(),
+                })
+            })?;
+
+        let lhs = Identifier {
+            symbol,
+        };
+
+        Ok(Stmt::Return(Assignment {
+            lhs,
+            rhs: return_expr,
+        }))
     }
 };
 
@@ -551,7 +601,6 @@ mulop: Expr = {
 };
 
 if_stmt: Stmt = {
-    // TODO: What should `decl` return?
     start_if "(" <condition: cond> ")" non_func_scoped_decl <mut then_block: stmt_list> <mut else_block: else_part> end_if_or_else => {
         // TODO: ADD a comment for why we need to reverse.
         then_block.reverse();
@@ -578,7 +627,6 @@ end_if_or_else: () = {
 };
 
 else_part: Vec<Stmt> = {
-    // TODO: What should `decl` return?
     start_else non_func_scoped_decl <stmt_list: stmt_list> => stmt_list,
     empty => vec![],
 };
@@ -620,7 +668,6 @@ incr_stmt: Option<Assignment> = {
 };
 
 for_stmt: Stmt = {
-    // TODO: What should `decl` return?
     start_for "(" <init: init_stmt> ";" <condition: cond> ";" <incr: incr_stmt> ")" non_func_scoped_decl <mut body: stmt_list> end_for => {
         // TODO: Add a comment for why we need to reverse statements.
         body.reverse();

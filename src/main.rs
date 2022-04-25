@@ -92,11 +92,11 @@ fn main() {
             .into_iter()
             .for_each(|code| println!(";{}", code));
 
-        // let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        // tiny_code
-        //     .sequence
-        //     .into_iter()
-        //     .for_each(|code| println!("{}", code));
+        let tiny_code: TinyCodeSequence = three_addr_codes.into();
+        tiny_code
+            .sequence
+            .into_iter()
+            .for_each(|code| println!("{}", code));
         /*******************************/
 
         Ok(())

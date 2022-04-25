@@ -1,8 +1,8 @@
 use crate::symbol_table::symbol::data;
+use crate::symbol_table::symbol::data::FunctionScopedSymbol;
+use crate::symbol_table::symbol::function;
 use crate::symbol_table::symbol::NumType;
 use std::rc::Rc;
-use crate::symbol_table::symbol::function;
-use crate::symbol_table::symbol::data::FunctionScopedSymbol;
 
 /// Differentiates an addition `Add` node
 /// from a subtraction `Add` node.
@@ -50,10 +50,10 @@ impl Identifier {
     pub fn data_type(&self) -> data::DataType {
         match &self.symbol {
             data::Symbol::NonFunctionScopedSymbol(symbol) => match **symbol {
-                    data::NonFunctionScopedSymbol::String { .. } => data::DataType::String,
-                    data::NonFunctionScopedSymbol::Int { .. } => data::DataType::Num(NumType::Int),
-                    data::NonFunctionScopedSymbol::Float { .. } => data::DataType::Num(NumType::Float),
-                }
+                data::NonFunctionScopedSymbol::String { .. } => data::DataType::String,
+                data::NonFunctionScopedSymbol::Int { .. } => data::DataType::Num(NumType::Int),
+                data::NonFunctionScopedSymbol::Float { .. } => data::DataType::Num(NumType::Float),
+            },
             data::Symbol::FunctionScopedSymbol(symbol) => match **symbol {
                 data::FunctionScopedSymbol::Int { .. } => data::DataType::Num(NumType::Int),
                 data::FunctionScopedSymbol::Float { .. } => data::DataType::Num(NumType::Float),
@@ -123,7 +123,11 @@ pub enum Stmt {
         incr: Option<Assignment>,
         body: Vec<Stmt>,
     },
-    Return(Expr),
+    // The return statement has been modeled to reflect
+    // the reality of Micro more closely. The return statement
+    // in Micro is an assignment to a memory location that is
+    // created by the caller, on the stack.
+    Return(Assignment),
     None,
 }
 

@@ -1,4 +1,7 @@
-use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType, TempF, TempI, FunctionIdent};
+use crate::three_addr_code_ir::{
+    BinaryExprOperand, FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType,
+    TempF, TempI,
+};
 
 #[derive(Debug, Clone, derive_more::Display)]
 pub enum ThreeAddressCode {
@@ -164,27 +167,25 @@ pub enum ThreeAddressCode {
     PopI(LValueI),
     #[display(fmt = "POP {}", _0)]
     PopF(LValueF),
-    #[display(fmt = "STOREI {} $R", _0)]
-    StoreFuncReturnValI(BinaryExprOperand),
-    #[display(fmt = "STOREF {} $R", _0)]
-    StoreFuncReturnValF(BinaryExprOperand),
 }
 
-// TODO: Factor out all type checking into its own visitor.
 pub mod visit {
     use crate::ast::ast_node::visit::Visitor;
     use crate::ast::ast_node::{
         AddOp, Assignment, AstNode, CmpOp, Condition, Expr, Item, MulOp, Stmt,
     };
     use crate::symbol_table::symbol::data::DataType;
-    use crate::symbol_table::symbol::{NumType, function};
+    use crate::symbol_table::symbol::function::ReturnType;
+    use crate::symbol_table::symbol::{function, NumType};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
     };
-    use crate::three_addr_code_ir::{BinaryExprOperand, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI, FunctionIdent, reset_temp_counter};
+    use crate::three_addr_code_ir::{
+        reset_temp_counter, BinaryExprOperand, FunctionIdent, IdentF, IdentI, LValueF, LValueI,
+        Label, ResultType, TempF, TempI,
+    };
     use typed_builder::TypedBuilder;
-    use crate::symbol_table::symbol::function::ReturnType;
 
     #[derive(Debug, Clone, TypedBuilder)]
     #[builder(field_defaults(default, setter(strip_option)))]
@@ -228,11 +229,13 @@ pub mod visit {
     impl Visitor<CodeObject> for ThreeAddressCodeVisitor {
         fn visit_item(&mut self, item: Item) -> CodeObject {
             match item {
-                // TODO: Implement unit tests for 3AC code gen for functions
+                // TODO [unit tests]: Implement unit tests for 3AC code gen for functions
                 Item::Function { symbol, body } => {
                     reset_temp_counter();
                     let mut code_sequence = vec![];
-                    code_sequence.push(ThreeAddressCode::FunctionLabel(FunctionIdent(symbol.clone())));
+                    code_sequence.push(ThreeAddressCode::FunctionLabel(FunctionIdent(
+                        symbol.clone(),
+                    )));
                     code_sequence.push(ThreeAddressCode::Link(FunctionIdent(symbol.clone())));
                     let mut func_body = body
                         .into_iter()
@@ -369,34 +372,14 @@ pub mod visit {
 
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
-                Stmt::Return(expr) => {
-                    let mut code_sequence = vec![];
-                    let mut expr_code_object = self.visit_expression(expr);
-                    code_sequence.append(&mut expr_code_object.code_sequence);
-
-                    // TODO: For call expressions the result can indeed be null. This
-                    // makes unwrapping the `result` field of expressions panic-prone
-                    // and unsafe, which we are doing at numerous places right now.
-                    if let CodeObject {
-                        result: Some(result),
-                        result_type: Some(result_type),
-                        ..
-                    } = expr_code_object {
-                        match result_type {
-                            ResultType::Int => code_sequence.push(ThreeAddressCode::StoreFuncReturnValI(result)),
-                            ResultType::Float => code_sequence.push(ThreeAddressCode::StoreFuncReturnValF(result)),
-                        }
-                    }
-
+                Stmt::Return(assignment) => {
+                    let mut code_sequence = self.visit_assignment(assignment).code_sequence;
                     code_sequence.push(ThreeAddressCode::Ret);
-
-                    CodeObject::builder()
-                        .code_sequence(code_sequence)
-                        .build()
-                },
+                    CodeObject::builder().code_sequence(code_sequence).build()
+                }
                 Stmt::None => {
                     panic!("Invalid AST: AST statement node contains statement variant `None`.")
-                },
+                }
             }
         }
 
@@ -636,14 +619,16 @@ pub mod visit {
                         ReturnType::Num(num_type) => match num_type {
                             NumType::Int => {
                                 let result_register = TempI::new();
-                                code_sequence.push(ThreeAddressCode::PopI(LValueI::Temp(result_register)));
+                                code_sequence
+                                    .push(ThreeAddressCode::PopI(LValueI::Temp(result_register)));
                                 (Some(result_register.into()), Some(ResultType::Int))
-                            },
+                            }
                             NumType::Float => {
                                 let result_register = TempF::new();
-                                code_sequence.push(ThreeAddressCode::PopF(LValueF::Temp(result_register)));
+                                code_sequence
+                                    .push(ThreeAddressCode::PopF(LValueF::Temp(result_register)));
                                 (Some(result_register.into()), Some(ResultType::Float))
-                            },
+                            }
                         },
                         ReturnType::Void => (None, None),
                     };
@@ -654,11 +639,11 @@ pub mod visit {
                             .result_type(result_type.unwrap())
                             .code_sequence(code_sequence)
                             .build(),
-                        ReturnType::Void => CodeObject::builder()
-                            .code_sequence(code_sequence)
-                            .build(),
+                        ReturnType::Void => {
+                            CodeObject::builder().code_sequence(code_sequence).build()
+                        }
                     }
-                },
+                }
                 Expr::None => {
                     panic!("Invalid AST: AST expression node contains expression variant `None`.")
                 }
@@ -831,20 +816,26 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Int {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Int {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-                    name: "a".to_string(),
-                })),
+                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                    data::NonFunctionScopedSymbol::Int {
+                        name: "a".to_string(),
+                    },
+                )),
             })),
         });
 
@@ -876,20 +867,26 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Float {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Float {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                    name: "a".to_string(),
-                })),
+                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                    data::NonFunctionScopedSymbol::Float {
+                        name: "a".to_string(),
+                    },
+                )),
             })),
         });
 
@@ -915,21 +912,27 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::String {
-                        name: "b".to_string(),
-                        value: "value".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::String {
+                            name: "b".to_string(),
+                            value: "value".to_string(),
+                        },
+                    )),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Float {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                    name: "a".to_string(),
-                })),
+                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                    data::NonFunctionScopedSymbol::Float {
+                        name: "a".to_string(),
+                    },
+                )),
             })),
         });
 
@@ -945,16 +948,20 @@ mod test {
             condition: Condition {
                 cmp_op: CmpOp::Lt,
                 lhs: Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::String {
-                        name: "b".to_string(),
-                        value: "value".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::String {
+                            name: "b".to_string(),
+                            value: "value".to_string(),
+                        },
+                    )),
                 }),
                 rhs: Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::String {
-                        name: "b".to_string(),
-                        value: "value".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::String {
+                            name: "b".to_string(),
+                            value: "value".to_string(),
+                        },
+                    )),
                 }),
             },
             then_block: vec![],
@@ -966,7 +973,6 @@ mod test {
         visitor.walk_ast(ast);
     }
 
-    // TODO: This test should not panic after STAGE5
     #[test]
     #[should_panic]
     fn convert_math_expression_with_mixed_num_operand_types_panics() {
@@ -975,20 +981,26 @@ mod test {
             lhs: Box::new(Expr::Mul {
                 op: MulOp::Mul,
                 lhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Int {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
                 rhs: Box::new(Expr::Id(Identifier {
-                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                        name: "b".to_string(),
-                    })),
+                    symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                        data::NonFunctionScopedSymbol::Float {
+                            name: "b".to_string(),
+                        },
+                    )),
                 })),
             }),
             rhs: Box::new(Expr::Id(Identifier {
-                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Float {
-                    name: "a".to_string(),
-                })),
+                symbol: data::Symbol::NonFunctionScopedSymbol(Rc::new(
+                    data::NonFunctionScopedSymbol::Float {
+                        name: "a".to_string(),
+                    },
+                )),
             })),
         });
 

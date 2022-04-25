@@ -27,10 +27,7 @@ impl DeclareExistingSymbolError {
 /// Type to represent errors originating
 /// from usage of undeclared symbols.
 #[derive(Debug, derive_more::Error, derive_more::Display, Getters, Eq, PartialEq, Clone)]
-#[display(
-    fmt = "Use of undeclared symbol: [{}].",
-    symbol_name,
-)]
+#[display(fmt = "Use of undeclared symbol: [{}].", symbol_name)]
 #[getset(get = "pub")]
 pub struct UseUndeclaredSymbolError {
     symbol_name: String,
@@ -38,9 +35,7 @@ pub struct UseUndeclaredSymbolError {
 
 impl UseUndeclaredSymbolError {
     pub fn new(symbol_name: String) -> Self {
-        UseUndeclaredSymbolError {
-            symbol_name,
-        }
+        UseUndeclaredSymbolError { symbol_name }
     }
 }
 
@@ -48,7 +43,7 @@ impl UseUndeclaredSymbolError {
 pub enum ScopeType {
     Global,
     Anonymous,
-    Function
+    Function,
 }
 
 /// Type to represent errors originating from declaring
@@ -60,7 +55,7 @@ pub enum ScopeType {
     fmt = "Symbol [{}], cannot be declared in scope with name: [{}] and type: [{}].",
     symbol_name,
     scope_name,
-    scope_type,
+    scope_type
 )]
 #[getset(get = "pub")]
 pub struct DeclareInInvalidScopeError {
@@ -91,5 +86,5 @@ pub enum SymbolError {
     /// User tries to declare symbols in an invalid
     /// scope. For instance, functions are the only
     /// scope where parameter symbols can be declared.
-    DeclareInInvalidSymbolScope(DeclareInInvalidScopeError)
+    DeclareInInvalidSymbolScope(DeclareInInvalidScopeError),
 }
