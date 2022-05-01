@@ -1,6 +1,6 @@
-use crate::cfg::basic_block::{BBLabel, ImmutableBasicBlock, BBFunction};
-use linked_hash_map::LinkedHashMap;
+use crate::cfg::basic_block::{BBFunction, BBLabel, ImmutableBasicBlock};
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+use linked_hash_map::LinkedHashMap;
 use std::fmt::{Display, Formatter};
 
 pub mod basic_block;
@@ -28,11 +28,11 @@ impl Display for ControlFlowGraph {
 }
 
 impl ControlFlowGraph {
-    pub fn new(cfg: LinkedHashMap<BBLabel, Vec<BBLabel>>, bbs: LinkedHashMap<BBLabel, ImmutableBasicBlock>) -> Self {
-        Self {
-            cfg,
-            bbs,
-        }
+    pub fn new(
+        cfg: LinkedHashMap<BBLabel, Vec<BBLabel>>,
+        bbs: LinkedHashMap<BBLabel, ImmutableBasicBlock>,
+    ) -> Self {
+        Self { cfg, bbs }
     }
 
     pub fn basic_blocks(&self) -> impl Iterator<Item = (&BBLabel, &ImmutableBasicBlock)> {
@@ -81,10 +81,7 @@ impl From<BBFunction> for ControlFlowGraph {
             }
         }
 
-        Self {
-            cfg,
-            bbs,
-        }
+        Self { cfg, bbs }
     }
 }
 

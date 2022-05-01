@@ -172,19 +172,19 @@ pub enum ThreeAddressCode {
 impl ThreeAddressCode {
     pub fn get_label_if_branch_or_jump(&self) -> Option<Label> {
         match self {
-            ThreeAddressCode::Jump(label) |
-            ThreeAddressCode::GtI { label, .. } |
-            ThreeAddressCode::LtI { label, .. } |
-            ThreeAddressCode::GteI { label, .. } |
-            ThreeAddressCode::LteI { label, .. } |
-            ThreeAddressCode::NeI { label, .. } |
-            ThreeAddressCode::EqI { label, .. } |
-            ThreeAddressCode::GtF { label, .. } |
-            ThreeAddressCode::LtF { label, .. } |
-            ThreeAddressCode::GteF { label, .. } |
-            ThreeAddressCode::LteF { label, .. } |
-            ThreeAddressCode::NeF { label, .. } |
-            ThreeAddressCode::EqF { label, .. }  => Some(*label),
+            ThreeAddressCode::Jump(label)
+            | ThreeAddressCode::GtI { label, .. }
+            | ThreeAddressCode::LtI { label, .. }
+            | ThreeAddressCode::GteI { label, .. }
+            | ThreeAddressCode::LteI { label, .. }
+            | ThreeAddressCode::NeI { label, .. }
+            | ThreeAddressCode::EqI { label, .. }
+            | ThreeAddressCode::GtF { label, .. }
+            | ThreeAddressCode::LtF { label, .. }
+            | ThreeAddressCode::GteF { label, .. }
+            | ThreeAddressCode::LteF { label, .. }
+            | ThreeAddressCode::NeF { label, .. }
+            | ThreeAddressCode::EqF { label, .. } => Some(*label),
             _ => None,
         }
     }

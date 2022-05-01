@@ -2,28 +2,28 @@
 #![allow(unused_imports)]
 mod asm;
 mod ast;
+mod cfg;
 mod symbol_table;
 mod three_addr_code_ir;
 mod token;
-mod cfg;
 
 #[macro_use]
 extern crate lalrpop_util;
 
 use crate::asm::tiny::TinyCodeSequence;
+use crate::cfg::basic_block::BBFunction;
 use crate::symbol_table::{SymbolTable, SYMBOL_TABLE};
 use crate::three_addr_code_ir::three_address_code::{
     visit::ThreeAddressCodeVisitor, ThreeAddressCode,
 };
-use crate::cfg::basic_block::BBFunction;
 
+use crate::cfg::ControlFlowGraph;
 use flexi_logger::Logger;
 use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
-use crate::cfg::ControlFlowGraph;
 
 lalrpop_mod!(pub microc);
 
@@ -107,8 +107,6 @@ fn main() {
             .map(|ast_node| visitor.walk_ast(ast_node))
             .map(|code_object| ControlFlowGraph::from(Into::<BBFunction>::into(code_object)))
             .for_each(|x| println!("{x}"));
-
-
 
         // let tiny_code: TinyCodeSequence = three_addr_codes.into();
         // tiny_code

@@ -7,13 +7,13 @@
 //! Control flow graph is a form of code representation that captures the flow of control
 //! in the code and aids us in performing middle-end optimizations, such as, register
 //! allocation.
-use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-use std::sync::atomic::{AtomicU64, Ordering};
 use crate::three_addr_code_ir::three_address_code::visit::CodeObject;
-use std::fmt::{Display, Formatter};
-use std::collections::HashMap;
+use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::Label;
 use linked_hash_map::LinkedHashMap;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 static BB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -72,19 +72,19 @@ impl BasicBlock {
     /// be basic block terminators.
     pub fn is_bb_terminator(tac: &ThreeAddressCode) -> bool {
         match tac {
-            ThreeAddressCode::Jump(_) |
-            ThreeAddressCode::GtI { .. } |
-            ThreeAddressCode::LtI { .. } |
-            ThreeAddressCode::GteI { .. } |
-            ThreeAddressCode::LteI { .. } |
-            ThreeAddressCode::NeI { .. } |
-            ThreeAddressCode::EqI { .. } |
-            ThreeAddressCode::GtF { .. } |
-            ThreeAddressCode::LtF { .. } |
-            ThreeAddressCode::GteF { .. } |
-            ThreeAddressCode::LteF { .. } |
-            ThreeAddressCode::NeF { .. } |
-            ThreeAddressCode::EqF { .. } => true,
+            ThreeAddressCode::Jump(_)
+            | ThreeAddressCode::GtI { .. }
+            | ThreeAddressCode::LtI { .. }
+            | ThreeAddressCode::GteI { .. }
+            | ThreeAddressCode::LteI { .. }
+            | ThreeAddressCode::NeI { .. }
+            | ThreeAddressCode::EqI { .. }
+            | ThreeAddressCode::GtF { .. }
+            | ThreeAddressCode::LtF { .. }
+            | ThreeAddressCode::GteF { .. }
+            | ThreeAddressCode::LteF { .. }
+            | ThreeAddressCode::NeF { .. }
+            | ThreeAddressCode::EqF { .. } => true,
             _ => false,
         }
     }
@@ -185,11 +185,11 @@ impl BBFunction {
         }
     }
 
-    pub fn basic_blocks(&self) -> impl Iterator<Item=&ImmutableBasicBlock> {
+    pub fn basic_blocks(&self) -> impl Iterator<Item = &ImmutableBasicBlock> {
         self.bbs.values()
     }
 
-    pub fn tac_label_to_bb_label_mappings(&self) -> impl Iterator<Item=(&Label, &BBLabel)> {
+    pub fn tac_label_to_bb_label_mappings(&self) -> impl Iterator<Item = (&Label, &BBLabel)> {
         self.tac_label_to_bb_label.iter()
     }
 
@@ -201,7 +201,12 @@ impl BBFunction {
         self.tac_label_to_bb_label.insert(tac_label, bb_label);
     }
 
-    pub fn into_parts(self) -> (LinkedHashMap<BBLabel, ImmutableBasicBlock>, HashMap<Label, BBLabel>) {
+    pub fn into_parts(
+        self,
+    ) -> (
+        LinkedHashMap<BBLabel, ImmutableBasicBlock>,
+        HashMap<Label, BBLabel>,
+    ) {
         (self.bbs, self.tac_label_to_bb_label)
     }
 }
@@ -212,32 +217,32 @@ impl From<CodeObject> for BBFunction {
         let mut func = BBFunction::new();
         let mut curr_bb = BasicBlock::new();
         for tac in code_object.code_sequence {
-             if BasicBlock::is_bb_terminator(&tac) {
-                 // If the this 3AC is a conditional or unconditional
-                 // jump code then the we need to add the jump 3AC to
-                 // the current bb, close the current bb and then
-                 // start a new bb.
-                 // Immediately following statements to the current
-                 // statement are bb leaders as they are implicit targets
-                 // of branch instructions.
+            if BasicBlock::is_bb_terminator(&tac) {
+                // If the this 3AC is a conditional or unconditional
+                // jump code then the we need to add the jump 3AC to
+                // the current bb, close the current bb and then
+                // start a new bb.
+                // Immediately following statements to the current
+                // statement are bb leaders as they are implicit targets
+                // of branch instructions.
                 curr_bb.add_tac(tac);
                 func.add_block(curr_bb.into());
                 curr_bb = BasicBlock::new()
             } else if let ThreeAddressCode::Label(label) = tac {
-                 // If this 3AC is a `Label` then we must close
-                 // the current bb, start a new bb and add the
-                 // label 3AC to the new bb. Current statement
-                 // is a bb leader as it an explicit target of
-                 // a conditional or unconditional branch.
-                 if !curr_bb.is_empty() {
-                     func.add_block(curr_bb.into());
-                     curr_bb = BasicBlock::new();
-                 }
-                 curr_bb.add_tac(tac);
+                // If this 3AC is a `Label` then we must close
+                // the current bb, start a new bb and add the
+                // label 3AC to the new bb. Current statement
+                // is a bb leader as it an explicit target of
+                // a conditional or unconditional branch.
+                if !curr_bb.is_empty() {
+                    func.add_block(curr_bb.into());
+                    curr_bb = BasicBlock::new();
+                }
+                curr_bb.add_tac(tac);
 
-                 // Add a 3AC label to bb label mapping
-                 func.add_tac_label_to_bb_label_mapping(label, curr_bb.label());
-             } else {
+                // Add a 3AC label to bb label mapping
+                func.add_tac_label_to_bb_label_mapping(label, curr_bb.label());
+            } else {
                 // Otherwise we simply add the 3AC to the
                 // curr bb.
                 curr_bb.add_tac(tac);
@@ -254,18 +259,22 @@ impl From<CodeObject> for BBFunction {
 
 #[cfg(test)]
 mod test {
-    use crate::three_addr_code_ir::three_address_code::visit::{CodeObject, ThreeAddressCodeVisitor};
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::three_addr_code_ir::{FunctionIdent, TempI, BinaryExprOperand, RValue, IdentI};
-    use std::rc::Rc;
-    use crate::symbol_table::symbol::{function, data};
-    use crate::symbol_table::symbol::function::ReturnType;
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{StoreI, Label, MulI, LteI, Jump, WriteI, Link, FunctionLabel};
-    use crate::three_addr_code_ir::LValueI;
     use crate::cfg::basic_block::{BBFunction, BBLabel};
-    use std::collections::HashMap;
-    use linked_hash_map::LinkedHashMap;
+    use crate::symbol_table::symbol::function::ReturnType;
+    use crate::symbol_table::symbol::{data, function};
     use crate::three_addr_code_ir;
+    use crate::three_addr_code_ir::three_address_code::visit::{
+        CodeObject, ThreeAddressCodeVisitor,
+    };
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
+        FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
+    };
+    use crate::three_addr_code_ir::LValueI;
+    use crate::three_addr_code_ir::{BinaryExprOperand, FunctionIdent, IdentI, RValue, TempI};
+    use linked_hash_map::LinkedHashMap;
+    use std::collections::HashMap;
+    use std::rc::Rc;
 
     lalrpop_mod!(pub microc);
 
@@ -295,118 +304,160 @@ mod test {
             END
         ";
 
-        let a = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-            name: "a".to_owned()
-        })));
-        let b = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-            name: "b".to_owned()
-        })));
-        let p = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-            name: "p".to_owned()
-        })));
-        let i = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(data::NonFunctionScopedSymbol::Int {
-            name: "i".to_owned()
-        })));
+        let a = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "a".to_owned(),
+            },
+        )));
+        let b = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "b".to_owned(),
+            },
+        )));
+        let p = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "p".to_owned(),
+            },
+        )));
+        let i = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "i".to_owned(),
+            },
+        )));
 
-        let main = FunctionIdent(Rc::new(function::Symbol::new("main".to_owned(), ReturnType::Void, vec![], vec![])));
-        let (t1, t2, t3, t4, t5, t6): (TempI, TempI, TempI, TempI, TempI, TempI) = (1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into());
-        let (tac_label1, tac_label2): (three_addr_code_ir::Label, three_addr_code_ir::Label) = (1.into(), 2.into());
-        let (bb_label0, bb_label1, bb_label2, bb_label3): (BBLabel, BBLabel, BBLabel, BBLabel) = (0.into(), 1.into(), 2.into(), 3.into());
+        let main = FunctionIdent(Rc::new(function::Symbol::new(
+            "main".to_owned(),
+            ReturnType::Void,
+            vec![],
+            vec![],
+        )));
+        let (t1, t2, t3, t4, t5, t6): (TempI, TempI, TempI, TempI, TempI, TempI) =
+            (1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into());
+        let (tac_label1, tac_label2): (three_addr_code_ir::Label, three_addr_code_ir::Label) =
+            (1.into(), 2.into());
+        let (bb_label0, bb_label1, bb_label2, bb_label3): (BBLabel, BBLabel, BBLabel, BBLabel) =
+            (0.into(), 1.into(), 2.into(), 3.into());
 
         let mut tac_label_to_bb_label = HashMap::new();
         tac_label_to_bb_label.insert(tac_label1, bb_label2);
         tac_label_to_bb_label.insert(tac_label2, bb_label3);
 
         let mut bbs = LinkedHashMap::new();
-        bbs.insert(bb_label0, (bb_label0, vec![
-            // LABEL main
-            FunctionLabel(main.clone()),
-            // LINK
-            Link(main),
-            // STOREI 4, $t1
-            StoreI {
-                lhs: LValueI::Temp(t1),
-                rhs: BinaryExprOperand::RValue(RValue::IntLiteral(4)),
-            },
-            // STOREI $t1 a
-            StoreI {
-                lhs: LValueI::Id(a.clone()),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t1)),
-            },
-            // STOREI 2 $T2
-            StoreI {
-                lhs: LValueI::Temp(t2),
-                rhs: BinaryExprOperand::RValue(RValue::IntLiteral(2)),
-            },
-            // STOREI $T2 b
-            StoreI {
-                lhs: LValueI::Id(b.clone()),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t2)),
-            },
-            // MULTI a b $T3
-            MulI {
-                lhs: BinaryExprOperand::LValueI(LValueI::Id(a.clone())),
-                rhs: BinaryExprOperand::LValueI(LValueI::Id(b.clone())),
-                temp_result: t3,
-            },
-            // STOREI $T3 p
-            StoreI {
-                lhs: LValueI::Id(p.clone()),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t3)),
-            },
-            // STOREI 10 $T4
-            StoreI {
-                lhs: LValueI::Temp(t4),
-                rhs: BinaryExprOperand::RValue(RValue::IntLiteral(10)),
-            },
-            // LE p $T4 label1
-            LteI {
-                lhs: BinaryExprOperand::LValueI(LValueI::Id(p.clone())),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t4)),
-                label: tac_label1
-            },
-        ]).into());
+        bbs.insert(
+            bb_label0,
+            (
+                bb_label0,
+                vec![
+                    // LABEL main
+                    FunctionLabel(main.clone()),
+                    // LINK
+                    Link(main),
+                    // STOREI 4, $t1
+                    StoreI {
+                        lhs: LValueI::Temp(t1),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(4)),
+                    },
+                    // STOREI $t1 a
+                    StoreI {
+                        lhs: LValueI::Id(a.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t1)),
+                    },
+                    // STOREI 2 $T2
+                    StoreI {
+                        lhs: LValueI::Temp(t2),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(2)),
+                    },
+                    // STOREI $T2 b
+                    StoreI {
+                        lhs: LValueI::Id(b.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t2)),
+                    },
+                    // MULTI a b $T3
+                    MulI {
+                        lhs: BinaryExprOperand::LValueI(LValueI::Id(a.clone())),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Id(b.clone())),
+                        temp_result: t3,
+                    },
+                    // STOREI $T3 p
+                    StoreI {
+                        lhs: LValueI::Id(p.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t3)),
+                    },
+                    // STOREI 10 $T4
+                    StoreI {
+                        lhs: LValueI::Temp(t4),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(10)),
+                    },
+                    // LE p $T4 label1
+                    LteI {
+                        lhs: BinaryExprOperand::LValueI(LValueI::Id(p.clone())),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t4)),
+                        label: tac_label1,
+                    },
+                ],
+            )
+                .into(),
+        );
 
-        bbs.insert(bb_label1, (bb_label1, vec![
-            // STOREI 42 $T5
-            StoreI {
-                lhs: LValueI::Temp(t5),
-                rhs: BinaryExprOperand::RValue(RValue::IntLiteral(42)),
-            },
-            // STOREI $T5 i
-            StoreI {
-                lhs: LValueI::Id(i.clone()),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t5)),
-            },
-            // JUMP label2
-            Jump(tac_label2),
-        ]).into());
+        bbs.insert(
+            bb_label1,
+            (
+                bb_label1,
+                vec![
+                    // STOREI 42 $T5
+                    StoreI {
+                        lhs: LValueI::Temp(t5),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(42)),
+                    },
+                    // STOREI $T5 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t5)),
+                    },
+                    // JUMP label2
+                    Jump(tac_label2),
+                ],
+            )
+                .into(),
+        );
 
-        bbs.insert(bb_label2, (bb_label2, vec![
-            // LABEL label1
-            Label(tac_label1),
-            // STOREI 24 $T6
-            StoreI {
-                lhs: LValueI::Temp(t6),
-                rhs: BinaryExprOperand::RValue(RValue::IntLiteral(24)),
-            },
-            // STOREI $T6 i
-            StoreI {
-                lhs: LValueI::Id(i.clone()),
-                rhs: BinaryExprOperand::LValueI(LValueI::Temp(t6)),
-            },
-            // JUMP label2
-            Jump(tac_label2),
-        ]).into());
+        bbs.insert(
+            bb_label2,
+            (
+                bb_label2,
+                vec![
+                    // LABEL label1
+                    Label(tac_label1),
+                    // STOREI 24 $T6
+                    StoreI {
+                        lhs: LValueI::Temp(t6),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(24)),
+                    },
+                    // STOREI $T6 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t6)),
+                    },
+                    // JUMP label2
+                    Jump(tac_label2),
+                ],
+            )
+                .into(),
+        );
 
-        bbs.insert(bb_label3, (bb_label3, vec![
-            // LABEL label2
-            Label(tac_label2),
-            // WRITEI i
-            WriteI {
-                identifier: i,
-            }
-        ]).into());
+        bbs.insert(
+            bb_label3,
+            (
+                bb_label3,
+                vec![
+                    // LABEL label2
+                    Label(tac_label2),
+                    // WRITEI i
+                    WriteI { identifier: i },
+                ],
+            )
+                .into(),
+        );
 
         let expected_bb_function = BBFunction {
             bbs,
