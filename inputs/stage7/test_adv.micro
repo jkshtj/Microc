@@ -1,0 +1,41 @@
+PROGRAM test
+BEGIN
+
+	INT count,enough;
+	FLOAT newapprox,approx,num,tolerance,diff;
+	STRING eol := "\n";
+	STRING space := " ";
+	FUNCTION VOID main()
+	BEGIN	
+		tolerance := 0.0001;
+--		num	:= 7.0;
+        READ(num);
+	
+		approx	:= num;
+		count 	:= 0;	
+		diff 	:= 0.0;
+	
+		FOR (enough := 0; enough != 1; )
+		
+			count := count + 1;
+			newapprox := 0.5*(approx + num/approx);
+ 	
+			diff := approx - newapprox; 
+			IF (diff > 0.0)
+				IF (diff < tolerance)
+					enough := 1;
+				FI
+			ELSE
+				IF (diff > (0.0 - tolerance))
+					enough := 1;
+				FI
+			FI
+
+			approx 	:= newapprox;
+
+		ROF
+		
+		WRITE(approx, space);
+		WRITE(count, eol);
+	END
+END

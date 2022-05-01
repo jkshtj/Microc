@@ -1,0 +1,35 @@
+PROGRAM p
+BEGIN
+
+	INT a,b,c;
+	FLOAT p,s,t;
+	STRING newline := "\n";
+	
+	FUNCTION VOID main()
+	BEGIN
+		a := 20;
+		b := 30;
+		c := 40;
+
+		c := c + a*b + (a*b+c)/a + 20;
+		b := b*b + a;
+		a := (b*a)/a;
+
+		WRITE (c);
+		WRITE(newline);
+		WRITE (b);
+		WRITE(newline);
+		WRITE (a);
+		WRITE(newline);
+		
+		p := 2.5;
+		s := 1.2;
+		t := 0.7;
+		
+		t := t * p - s + p * s;
+		
+		WRITE(t);
+		WRITE(newline);
+	
+	END
+END
