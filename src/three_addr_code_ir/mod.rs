@@ -34,6 +34,13 @@ impl Label {
     }
 }
 
+#[cfg(test)]
+impl From<u64> for Label {
+    fn from(n: u64) -> Self {
+        Self(n)
+    }
+}
+
 /// 3AC concept to represent int registers.
 /// There is no limit to the number
 /// of int temporaries that can be created.
@@ -44,6 +51,13 @@ pub struct TempI(u64);
 impl TempI {
     pub fn new() -> Self {
         Self(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
+    }
+}
+
+#[cfg(test)]
+impl From<u64> for TempI {
+    fn from(n: u64) -> Self {
+        Self(n)
     }
 }
 
@@ -61,7 +75,7 @@ impl TempF {
 }
 
 /// Int identifier
-#[derive(Debug, derive_more::Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
 pub struct IdentI(pub data::Symbol);
 
 impl From<Identifier> for IdentI {
@@ -71,7 +85,7 @@ impl From<Identifier> for IdentI {
 }
 
 /// Float identifier
-#[derive(Debug, derive_more::Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
 pub struct IdentF(pub data::Symbol);
 
 impl From<Identifier> for IdentF {
@@ -81,7 +95,7 @@ impl From<Identifier> for IdentF {
 }
 
 /// String identifier
-#[derive(Debug, derive_more::Display, Clone)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
 pub struct IdentS(pub data::Symbol);
 
 impl From<Identifier> for IdentS {
@@ -93,7 +107,7 @@ impl From<Identifier> for IdentS {
 /// Represents an int type LValue
 /// that can either be a temporary
 /// or an int identifier.
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq)]
 pub enum LValueI {
     Temp(TempI),
     #[display(fmt = "{}", _0)]
@@ -103,7 +117,7 @@ pub enum LValueI {
 /// Represents an float type LValue
 /// that can either be a temporary
 /// or an float identifier.
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq)]
 pub enum LValueF {
     Temp(TempF),
     #[display(fmt = "{}", _0)]
@@ -113,13 +127,13 @@ pub enum LValueF {
 /// Represents a RValue that can
 /// either be an int or a float
 /// literal.
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, PartialEq)]
 pub enum RValue {
     IntLiteral(i32),
     FloatLiteral(f64),
 }
 
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, PartialEq)]
 pub enum BinaryExprOperand {
     LValueI(LValueI),
     LValueF(LValueF),
@@ -211,7 +225,7 @@ impl From<data::DataType> for ResultType {
 }
 
 /// Function identifier
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FunctionIdent(pub Rc<function::Symbol>);
 
 impl FunctionIdent {

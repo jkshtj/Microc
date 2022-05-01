@@ -3,7 +3,7 @@ use crate::three_addr_code_ir::{
     TempF, TempI,
 };
 
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, PartialEq)]
 pub enum ThreeAddressCode {
     #[display(fmt = "ADDI {} {} {}", lhs, rhs, temp_result)]
     AddI {
@@ -167,6 +167,34 @@ pub enum ThreeAddressCode {
     PopI(LValueI),
     #[display(fmt = "POP {}", _0)]
     PopF(LValueF),
+}
+
+impl ThreeAddressCode {
+    pub fn get_label_if_branch_or_jump(&self) -> Option<Label> {
+        match self {
+            ThreeAddressCode::Jump(label) |
+            ThreeAddressCode::GtI { label, .. } |
+            ThreeAddressCode::LtI { label, .. } |
+            ThreeAddressCode::GteI { label, .. } |
+            ThreeAddressCode::LteI { label, .. } |
+            ThreeAddressCode::NeI { label, .. } |
+            ThreeAddressCode::EqI { label, .. } |
+            ThreeAddressCode::GtF { label, .. } |
+            ThreeAddressCode::LtF { label, .. } |
+            ThreeAddressCode::GteF { label, .. } |
+            ThreeAddressCode::LteF { label, .. } |
+            ThreeAddressCode::NeF { label, .. } |
+            ThreeAddressCode::EqF { label, .. }  => Some(*label),
+            _ => None,
+        }
+    }
+
+    pub fn is_unconditional_branch(&self) -> bool {
+        match self {
+            ThreeAddressCode::Jump(_) => true,
+            _ => false,
+        }
+    }
 }
 
 pub mod visit {

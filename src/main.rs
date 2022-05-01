@@ -5,6 +5,7 @@ mod ast;
 mod symbol_table;
 mod three_addr_code_ir;
 mod token;
+mod cfg;
 
 #[macro_use]
 extern crate lalrpop_util;
@@ -14,12 +15,15 @@ use crate::symbol_table::{SymbolTable, SYMBOL_TABLE};
 use crate::three_addr_code_ir::three_address_code::{
     visit::ThreeAddressCodeVisitor, ThreeAddressCode,
 };
+use crate::cfg::basic_block::BBFunction;
+
 use flexi_logger::Logger;
 use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
+use crate::cfg::ControlFlowGraph;
 
 lalrpop_mod!(pub microc);
 
@@ -82,21 +86,35 @@ fn main() {
         let mut result = program.unwrap();
         let mut visitor = ThreeAddressCodeVisitor;
         result.reverse();
-        let three_addr_codes: Vec<ThreeAddressCode> = result
-            .into_iter()
-            .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
-            .collect();
+        // let three_addr_codes: Vec<ThreeAddressCode> = result
+        //     .into_iter()
+        //     .flat_map(|ast_node| visitor.walk_ast(ast_node).code_sequence)
+        //     .collect();
+        //
+        // three_addr_codes
+        //     .clone()
+        //     .into_iter()
+        //     .for_each(|code| println!(";{}", code));
 
-        three_addr_codes
-            .clone()
-            .into_iter()
-            .for_each(|code| println!(";{}", code));
+        // result
+        //     .into_iter()
+        //     .map(|ast_node| visitor.walk_ast(ast_node))
+        //     .map(|code_object| Into::<BBFunction>::into(code_object))
+        //     .for_each(|x| println!("{x}"));
 
-        let tiny_code: TinyCodeSequence = three_addr_codes.into();
-        tiny_code
-            .sequence
+        result
             .into_iter()
-            .for_each(|code| println!("{}", code));
+            .map(|ast_node| visitor.walk_ast(ast_node))
+            .map(|code_object| ControlFlowGraph::from(Into::<BBFunction>::into(code_object)))
+            .for_each(|x| println!("{x}"));
+
+
+
+        // let tiny_code: TinyCodeSequence = three_addr_codes.into();
+        // tiny_code
+        //     .sequence
+        //     .into_iter()
+        //     .for_each(|code| println!("{}", code));
         /*******************************/
 
         Ok(())
