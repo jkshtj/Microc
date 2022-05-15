@@ -19,7 +19,7 @@ lazy_static = "1.4.0"
 linked_hash_set = "0.1.4"
 linked-hash-map = "0.5.4"
 regex = "1.5.4"
-serial_test = "0.5.1"
+serial_test = "0.6.0"
 typed-builder = "0.9.1"
 tracing = { version = "0.1.28", features = ["log-always"] }
 

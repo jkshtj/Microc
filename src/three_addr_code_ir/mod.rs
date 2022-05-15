@@ -19,6 +19,12 @@ pub fn reset_temp_counter() {
     TEMP_COUNTER.store(1, Ordering::SeqCst);
 }
 
+/// Resets the count of labels used so far.
+#[cfg(test)]
+pub fn reset_label_counter() {
+    LABEL_COUNTER.store(1, Ordering::SeqCst);
+}
+
 /// Represents a point in the 3AC representation
 /// required to support control flow.
 #[derive(Debug, derive_more::Display, Copy, Clone, Eq, PartialEq, Hash)]

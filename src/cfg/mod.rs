@@ -5,9 +5,13 @@ use std::fmt::{Display, Formatter};
 
 pub mod basic_block;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ControlFlowGraph {
-    cfg: LinkedHashMap<BBLabel, Vec<BBLabel>>,
+    /// Basic block map - maps parent basic block
+    /// to child basic blocks.
+    bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>,
+    /// List of basi blocks contained in the control
+    /// flow graph.
     bbs: LinkedHashMap<BBLabel, ImmutableBasicBlock>,
 }
 
@@ -19,7 +23,7 @@ impl Display for ControlFlowGraph {
         }
 
         writeln!(f, "==== CFG ===")?;
-        for (from, to) in self.cfg() {
+        for (from, to) in self.basic_block_map() {
             writeln!(f, "{}: {:?}", from, to)?;
         }
 
@@ -29,28 +33,28 @@ impl Display for ControlFlowGraph {
 
 impl ControlFlowGraph {
     pub fn new(
-        cfg: LinkedHashMap<BBLabel, Vec<BBLabel>>,
+        bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>,
         bbs: LinkedHashMap<BBLabel, ImmutableBasicBlock>,
     ) -> Self {
-        Self { cfg, bbs }
+        Self { bb_map, bbs }
     }
 
     pub fn basic_blocks(&self) -> impl Iterator<Item = (&BBLabel, &ImmutableBasicBlock)> {
         self.bbs.iter()
     }
 
-    pub fn cfg(&self) -> impl Iterator<Item = (&BBLabel, &Vec<BBLabel>)> {
-        self.cfg.iter()
+    pub fn basic_block_map(&self) -> impl Iterator<Item = (&BBLabel, &Vec<BBLabel>)> {
+        self.bb_map.iter()
     }
 }
 
 impl From<BBFunction> for ControlFlowGraph {
     fn from(bb_function: BBFunction) -> Self {
-        fn create_edge(cfg: &mut LinkedHashMap<BBLabel, Vec<BBLabel>>, from: BBLabel, to: BBLabel) {
-            cfg.entry(from).or_insert(vec![]).push(to);
+        fn create_edge(bb_map: &mut LinkedHashMap<BBLabel, Vec<BBLabel>>, from: BBLabel, to: BBLabel) {
+            bb_map.entry(from).or_insert(vec![]).push(to);
         }
 
-        let mut cfg = LinkedHashMap::new();
+        let mut bb_map = LinkedHashMap::new();
         let (bbs, tac_label_to_bb_label_map) = bb_function.into_parts();
         // Tracking the prev bb and whether its
         // last statement is an unconditional jump
@@ -68,7 +72,7 @@ impl From<BBFunction> for ControlFlowGraph {
             // block to the current block.
             if let Some(prev_bb_label) = prev_bb_label {
                 if !prev_bb_has_unconditional_jump {
-                    create_edge(&mut cfg, prev_bb_label, *bb_label);
+                    create_edge(&mut bb_map, prev_bb_label, *bb_label);
                 }
             }
             prev_bb_label.replace(*bb_label);
@@ -77,15 +81,277 @@ impl From<BBFunction> for ControlFlowGraph {
             // Create an edge to the explicit jump/branch target
             // of the current basic block.
             if let Some(tac_label) = last_tac.get_label_if_branch_or_jump() {
-                create_edge(&mut cfg, *bb_label, tac_label_to_bb_label_map[&tac_label]);
+                create_edge(&mut bb_map, *bb_label, tac_label_to_bb_label_map[&tac_label]);
             }
         }
 
-        Self { cfg, bbs }
+        Self { bb_map, bbs }
     }
 }
 
 #[cfg(test)]
 mod test {
-    // TODO [unit tests]: Add unit tests
+    use crate::cfg::basic_block::{BBFunction, BBLabel};
+    use crate::symbol_table::symbol::function::ReturnType;
+    use crate::symbol_table::symbol::{data, function};
+    use crate::three_addr_code_ir;
+    use crate::three_addr_code_ir::three_address_code::visit::{
+        CodeObject, ThreeAddressCodeVisitor,
+    };
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
+        FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
+    };
+    use crate::three_addr_code_ir::{LValueI, reset_label_counter};
+    use crate::three_addr_code_ir::{BinaryExprOperand, FunctionIdent, IdentI, RValue, TempI};
+    use linked_hash_map::LinkedHashMap;
+    use std::collections::HashMap;
+    use std::rc::Rc;
+    use crate::cfg::ControlFlowGraph;
+    use serial_test::serial;
+
+    lalrpop_mod!(pub microc);
+
+    #[test]
+    #[serial]
+    fn bb_function_to_cfg() {
+        reset_label_counter();
+
+        let program = r"
+            PROGRAM sample
+            BEGIN
+
+                INT a, b, i, p;
+
+                FUNCTION VOID main()
+                BEGIN
+
+                    a := 4;
+                    b := 2;
+                    p := a*b;
+
+                    IF (p > 10)
+                        i := 42;
+                    ELSE
+                        i := 24;
+                    FI
+
+                    WRITE (i);
+                END
+            END
+        ";
+
+        let a = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "a".to_owned(),
+            },
+        )));
+        let b = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "b".to_owned(),
+            },
+        )));
+        let p = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "p".to_owned(),
+            },
+        )));
+        let i = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "i".to_owned(),
+            },
+        )));
+
+        let main = FunctionIdent(Rc::new(function::Symbol::new(
+            "main".to_owned(),
+            ReturnType::Void,
+            vec![],
+            vec![],
+        )));
+        let (t1, t2, t3, t4, t5, t6): (TempI, TempI, TempI, TempI, TempI, TempI) =
+            (1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into());
+        let (tac_label1, tac_label2): (three_addr_code_ir::Label, three_addr_code_ir::Label) =
+            (1.into(), 2.into());
+        let (bb_label0, bb_label1, bb_label2, bb_label3): (BBLabel, BBLabel, BBLabel, BBLabel) =
+            (0.into(), 1.into(), 2.into(), 3.into());
+
+        let mut bbs = LinkedHashMap::new();
+        bbs.insert(
+            bb_label0,
+            (
+                bb_label0,
+                vec![
+                    // LABEL main
+                    FunctionLabel(main.clone()),
+                    // LINK
+                    Link(main),
+                    // STOREI 4, $t1
+                    StoreI {
+                        lhs: LValueI::Temp(t1),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(4)),
+                    },
+                    // STOREI $t1 a
+                    StoreI {
+                        lhs: LValueI::Id(a.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t1)),
+                    },
+                    // STOREI 2 $T2
+                    StoreI {
+                        lhs: LValueI::Temp(t2),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(2)),
+                    },
+                    // STOREI $T2 b
+                    StoreI {
+                        lhs: LValueI::Id(b.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t2)),
+                    },
+                    // MULTI a b $T3
+                    MulI {
+                        lhs: BinaryExprOperand::LValueI(LValueI::Id(a.clone())),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Id(b.clone())),
+                        temp_result: t3,
+                    },
+                    // STOREI $T3 p
+                    StoreI {
+                        lhs: LValueI::Id(p.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t3)),
+                    },
+                    // STOREI 10 $T4
+                    StoreI {
+                        lhs: LValueI::Temp(t4),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(10)),
+                    },
+                    // LE p $T4 label1
+                    LteI {
+                        lhs: BinaryExprOperand::LValueI(LValueI::Id(p.clone())),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t4)),
+                        label: tac_label1,
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label1,
+            (
+                bb_label1,
+                vec![
+                    // STOREI 42 $T5
+                    StoreI {
+                        lhs: LValueI::Temp(t5),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(42)),
+                    },
+                    // STOREI $T5 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t5)),
+                    },
+                    // JUMP label2
+                    Jump(tac_label2),
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label2,
+            (
+                bb_label2,
+                vec![
+                    // LABEL label1
+                    Label(tac_label1),
+                    // STOREI 24 $T6
+                    StoreI {
+                        lhs: LValueI::Temp(t6),
+                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(24)),
+                    },
+                    // STOREI $T6 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t6)),
+                    },
+                    // JUMP label2
+                    Jump(tac_label2),
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label3,
+            (
+                bb_label3,
+                vec![
+                    // LABEL label2
+                    Label(tac_label2),
+                    // WRITEI i
+                    WriteI { identifier: i },
+                ],
+            )
+                .into(),
+        );
+
+        let mut bb_map = LinkedHashMap::new();
+        bb_map.insert(bb_label0, vec![bb_label2, bb_label1]);
+        bb_map.insert(bb_label1, vec![bb_label3]);
+        bb_map.insert(bb_label2, vec![bb_label3]);
+
+        let expected_cfg = ControlFlowGraph::new(bb_map, bbs);
+
+        // Parse program, generate 3AC, convert it into a `BBFunction` and convert `BBFunction` to a `ControlFlowGraph`
+        let program = microc::ProgramParser::new().parse(&program);
+        let mut result = program.unwrap();
+        let mut visitor = ThreeAddressCodeVisitor;
+        result.reverse();
+        let cfg = result
+            .into_iter()
+            .map(|ast_node| visitor.walk_ast(ast_node))
+            .map(|code_object| Into::<BBFunction>::into(code_object))
+            .map(|bb_func| Into::<ControlFlowGraph>::into(bb_func))
+            .last()
+            .unwrap();
+
+        /*
+            Expected control flow graph -
+            ```
+            ==== Basic Blocks ===
+            BB0:
+            LABEL main
+            LINK
+            STOREI 4 $T1
+            STOREI $T1 a
+            STOREI 2 $T2
+            STOREI $T2 b
+            MULTI a b $T3
+            STOREI $T3 p
+            STOREI 10 $T4
+            LE p $T4 label1
+
+            BB1:
+            STOREI 42 $T5
+            STOREI $T5 i
+            JUMP label2
+
+            BB2:
+            LABEL label1
+            STOREI 24 $T6
+            STOREI $T6 i
+            JUMP label2
+
+            BB3:
+            LABEL label2
+            WRITEI i
+
+            ==== CFG ===
+            BB0: [BBLabel(2), BBLabel(1)]
+            BB1: [BBLabel(3)]
+            BB2: [BBLabel(3)]
+            ```
+        */
+        // println!("{expected_cfg}");
+        // println!("{cfg}");
+
+        assert_eq!(expected_cfg, cfg);
+    }
 }
