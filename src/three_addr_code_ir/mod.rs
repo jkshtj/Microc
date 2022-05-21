@@ -69,7 +69,7 @@ impl From<u64> for TempI {
 
 /// 3AC concept to represent float registers.
 /// There is no limit to the number
-/// of flaot temporaries that can be created.
+/// of float temporaries that can be created.
 #[derive(Debug, Copy, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
 pub struct TempF(u64);
@@ -81,7 +81,7 @@ impl TempF {
 }
 
 /// Int identifier
-#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq, Hash)]
 pub struct IdentI(pub data::Symbol);
 
 impl From<Identifier> for IdentI {
@@ -91,7 +91,7 @@ impl From<Identifier> for IdentI {
 }
 
 /// Float identifier
-#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq, Hash)]
 pub struct IdentF(pub data::Symbol);
 
 impl From<Identifier> for IdentF {
@@ -101,7 +101,7 @@ impl From<Identifier> for IdentF {
 }
 
 /// String identifier
-#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq)]
+#[derive(Debug, derive_more::Display, Clone, Eq, PartialEq, Hash)]
 pub struct IdentS(pub data::Symbol);
 
 impl From<Identifier> for IdentS {
@@ -113,7 +113,7 @@ impl From<Identifier> for IdentS {
 /// Represents an int type LValue
 /// that can either be a temporary
 /// or an int identifier.
-#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq)]
+#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 pub enum LValueI {
     Temp(TempI),
     #[display(fmt = "{}", _0)]
@@ -123,90 +123,132 @@ pub enum LValueI {
 /// Represents an float type LValue
 /// that can either be a temporary
 /// or an float identifier.
-#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq)]
+#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 pub enum LValueF {
     Temp(TempF),
     #[display(fmt = "{}", _0)]
     Id(IdentF),
 }
 
-/// Represents a RValue that can
-/// either be an int or a float
-/// literal.
-#[derive(Debug, Clone, derive_more::Display, PartialEq)]
-pub enum RValue {
-    IntLiteral(i32),
-    FloatLiteral(f64),
-}
-
-#[derive(Debug, Clone, derive_more::Display, PartialEq)]
-pub enum BinaryExprOperand {
+/// Represents an LValue that
+/// may be an int or a float.
+#[derive(Debug, Clone, derive_more::Display, Eq, PartialEq, Hash)]
+pub enum LValue {
     LValueI(LValueI),
     LValueF(LValueF),
-    RValue(RValue),
 }
 
-impl BinaryExprOperand {
+impl LValue {
+    pub fn result_type(&self) -> ResultType {
+        match self {
+            LValue::LValueI(_) => ResultType::Int,
+            LValue::LValueF(_) => ResultType::Float,
+        }
+    }
+}
+
+impl From<TempI> for LValue {
+    fn from(temp: TempI) -> Self {
+        LValue::LValueI(LValueI::Temp(temp))
+    }
+}
+
+impl From<TempF> for LValue {
+    fn from(temp: TempF) -> Self {
+        LValue::LValueF(LValueF::Temp(temp))
+    }
+}
+
+impl From<IdentI> for LValue {
+    fn from(val: IdentI) -> Self {
+        LValue::LValueI(LValueI::Id(val))
+    }
+}
+
+impl From<IdentF> for LValue {
+    fn from(val: IdentF) -> Self {
+        LValue::LValueF(LValueF::Id(val))
+    }
+}
+
+
+/// Integer type binary expression operand
+#[derive(Debug, Clone, derive_more::Display, PartialEq)]
+pub enum BinaryExprOperandI {
+    LValue(LValueI),
+    RValue(i32),
+}
+
+impl BinaryExprOperandI {
     pub fn is_mem_ref(&self) -> bool {
         match self {
-            BinaryExprOperand::LValueI(LValueI::Id(_)) => true,
-            BinaryExprOperand::LValueF(LValueF::Id(_)) => true,
+            BinaryExprOperandI::LValue(LValueI::Id(_)) => true,
             _ => false,
         }
     }
 }
 
-impl From<TempI> for BinaryExprOperand {
+impl From<TempI> for BinaryExprOperandI {
     fn from(temp: TempI) -> Self {
-        BinaryExprOperand::LValueI(LValueI::Temp(temp))
+        BinaryExprOperandI::LValue(LValueI::Temp(temp))
     }
 }
 
-impl From<TempF> for BinaryExprOperand {
-    fn from(temp: TempF) -> Self {
-        BinaryExprOperand::LValueF(LValueF::Temp(temp))
-    }
-}
-
-impl From<IdentI> for BinaryExprOperand {
+impl From<IdentI> for BinaryExprOperandI {
     fn from(val: IdentI) -> Self {
-        BinaryExprOperand::LValueI(LValueI::Id(val))
+        BinaryExprOperandI::LValue(LValueI::Id(val))
     }
 }
 
-impl From<IdentF> for BinaryExprOperand {
-    fn from(val: IdentF) -> Self {
-        BinaryExprOperand::LValueF(LValueF::Id(val))
-    }
-}
-
-impl From<i32> for BinaryExprOperand {
+impl From<i32> for BinaryExprOperandI {
     fn from(val: i32) -> Self {
-        BinaryExprOperand::RValue(RValue::IntLiteral(val))
+        BinaryExprOperandI::RValue(val)
     }
 }
 
-impl From<f64> for BinaryExprOperand {
-    fn from(val: f64) -> Self {
-        BinaryExprOperand::RValue(RValue::FloatLiteral(val))
-    }
-}
-
-impl From<LValueI> for BinaryExprOperand {
+impl From<LValueI> for BinaryExprOperandI {
     fn from(lvalue: LValueI) -> Self {
-        BinaryExprOperand::LValueI(lvalue)
+        BinaryExprOperandI::LValue(lvalue)
     }
 }
 
-impl From<LValueF> for BinaryExprOperand {
+/// Float type binary expression operand
+#[derive(Debug, Clone, derive_more::Display, PartialEq)]
+pub enum BinaryExprOperandF {
+    LValue(LValueF),
+    RValue(f64),
+}
+
+impl BinaryExprOperandF {
+    pub fn is_mem_ref(&self) -> bool {
+        match self {
+            BinaryExprOperandF::LValue(LValueF::Id(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl From<TempF> for BinaryExprOperandF {
+    fn from(temp: TempF) -> Self {
+        BinaryExprOperandF::LValue(LValueF::Temp(temp))
+    }
+}
+
+impl From<IdentF> for BinaryExprOperandF {
+    fn from(val: IdentF) -> Self {
+        BinaryExprOperandF::LValue(LValueF::Id(val))
+    }
+}
+
+impl From<f64> for BinaryExprOperandF {
+    fn from(val: f64) -> Self {
+        BinaryExprOperandF::RValue(val)
+    }
+}
+
+impl From<LValueF> for BinaryExprOperandF {
     fn from(lvalue: LValueF) -> Self {
-        BinaryExprOperand::LValueF(lvalue)
-    }
-}
-
-impl From<RValue> for BinaryExprOperand {
-    fn from(rvalue: RValue) -> Self {
-        BinaryExprOperand::RValue(rvalue)
+        BinaryExprOperandF::LValue(lvalue)
     }
 }
 

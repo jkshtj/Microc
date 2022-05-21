@@ -1,5 +1,5 @@
 use crate::three_addr_code_ir::{
-    BinaryExprOperand, FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType,
+    BinaryExprOperandI, BinaryExprOperandF, FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType,
     TempF, TempI,
 };
 
@@ -7,32 +7,32 @@ use crate::three_addr_code_ir::{
 pub enum ThreeAddressCode {
     #[display(fmt = "ADDI {} {} {}", lhs, rhs, temp_result)]
     AddI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         temp_result: TempI,
     },
     #[display(fmt = "SUBI {} {} {}", lhs, rhs, temp_result)]
     SubI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         temp_result: TempI,
     },
     #[display(fmt = "MULTI {} {} {}", lhs, rhs, temp_result)]
     MulI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         temp_result: TempI,
     },
     #[display(fmt = "DIVI {} {} {}", lhs, rhs, temp_result)]
     DivI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         temp_result: TempI,
     },
     #[display(fmt = "STOREI {} {}", rhs, lhs)]
     StoreI {
         lhs: LValueI,
-        rhs: BinaryExprOperand,
+        rhs: BinaryExprOperandI,
     },
     #[display(fmt = "READI {}", identifier)]
     ReadI { identifier: IdentI },
@@ -40,32 +40,32 @@ pub enum ThreeAddressCode {
     WriteI { identifier: IdentI },
     #[display(fmt = "ADDF {} {} {}", lhs, rhs, temp_result)]
     AddF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         temp_result: TempF,
     },
     #[display(fmt = "SUBF {} {} {}", lhs, rhs, temp_result)]
     SubF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         temp_result: TempF,
     },
     #[display(fmt = "MULTF {} {} {}", lhs, rhs, temp_result)]
     MulF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         temp_result: TempF,
     },
     #[display(fmt = "DIVF {} {} {}", lhs, rhs, temp_result)]
     DivF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         temp_result: TempF,
     },
     #[display(fmt = "STOREF {} {}", rhs, lhs)]
     StoreF {
         lhs: LValueF,
-        rhs: BinaryExprOperand,
+        rhs: BinaryExprOperandF,
     },
     #[display(fmt = "READF {}", identifier)]
     ReadF { identifier: IdentF },
@@ -79,74 +79,74 @@ pub enum ThreeAddressCode {
     Jump(Label),
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
     GtI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
     LtI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
     GteI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
     LteI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
     NeI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
     EqI {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandI,
+        rhs: BinaryExprOperandI,
         label: Label,
     },
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
     GtF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
     LtF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
     GteF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
     LteF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
     NeF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
     EqF {
-        lhs: BinaryExprOperand,
-        rhs: BinaryExprOperand,
+        lhs: BinaryExprOperandF,
+        rhs: BinaryExprOperandF,
         label: Label,
     },
     #[display(fmt = "LABEL {}", "_0.name()")]
@@ -160,7 +160,9 @@ pub enum ThreeAddressCode {
     #[display(fmt = "PUSH")]
     PushEmpty,
     #[display(fmt = "PUSH {}", _0)]
-    Push(BinaryExprOperand),
+    PushI(BinaryExprOperandI),
+    #[display(fmt = "PUSH {}", _0)]
+    PushF(BinaryExprOperandF),
     #[display(fmt = "POP")]
     PopEmpty,
     #[display(fmt = "POP {}", _0)]
@@ -209,37 +211,34 @@ pub mod visit {
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
     };
-    use crate::three_addr_code_ir::{
-        reset_temp_counter, BinaryExprOperand, FunctionIdent, IdentF, IdentI, LValueF, LValueI,
-        Label, ResultType, TempF, TempI,
-    };
+    use crate::three_addr_code_ir::{reset_temp_counter, FunctionIdent, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI, LValue};
     use typed_builder::TypedBuilder;
 
     #[derive(Debug, Clone, TypedBuilder)]
     #[builder(field_defaults(default, setter(strip_option)))]
     pub struct CodeObject {
-        pub result: Option<BinaryExprOperand>,
-        pub result_type: Option<ResultType>,
+        pub result: Option<LValue>,
         pub jump_to: Option<Label>,
         #[builder(setter(!strip_option))]
         pub code_sequence: Vec<ThreeAddressCode>,
+    }
+
+    #[cfg(test)]
+    impl CodeObject {
+        pub fn result_type(&self) -> Option<ResultType> {
+            self.result.as_ref().map(|lvalue| {
+                match lvalue {
+                    LValue::LValueI(_) => ResultType::Int,
+                    LValue::LValueF(_) => ResultType::Float,
+                }
+            })
+        }
     }
 
     #[derive(Debug)]
     pub struct ThreeAddressCodeVisitor;
 
     impl ThreeAddressCodeVisitor {
-        pub fn combined_result_type(left: ResultType, right: ResultType) -> ResultType {
-            match (left, right) {
-                (ResultType::Float, ResultType::Float) => ResultType::Float,
-                (ResultType::Int, ResultType::Int) => ResultType::Int,
-                (_, _) => panic!(
-                    "Unsupported result type combination. Left: [{:?}], Right: [{:?}]",
-                    left, right
-                ),
-            }
-        }
-
         pub fn walk_ast(&mut self, ast: AstNode) -> CodeObject {
             match ast {
                 AstNode::Stmt(stmt) => self.visit_statement(stmt),
@@ -416,14 +415,13 @@ pub mod visit {
                 Expr::Id(identifier) => {
                     let result_type = identifier.data_type().into();
 
-                    let result: BinaryExprOperand = match result_type {
+                    let result: LValue = match result_type {
                         ResultType::Int => IdentI(identifier.symbol).into(),
                         ResultType::Float => IdentF(identifier.symbol).into(),
                     };
 
                     CodeObject::builder()
                         .result(result)
-                        .result_type(result_type)
                         .build()
                 }
                 Expr::IntLiteral(n) => {
@@ -431,7 +429,6 @@ pub mod visit {
 
                     CodeObject::builder()
                         .result(temp_result.into())
-                        .result_type(ResultType::Int)
                         .code_sequence(vec![ThreeAddressCode::StoreI {
                             lhs: LValueI::Temp(temp_result),
                             rhs: n.into(),
@@ -443,7 +440,6 @@ pub mod visit {
 
                     CodeObject::builder()
                         .result(temp_result.into())
-                        .result_type(ResultType::Float)
                         .code_sequence(vec![ThreeAddressCode::StoreF {
                             lhs: LValueF::Temp(temp_result),
                             rhs: n.into(),
@@ -454,66 +450,67 @@ pub mod visit {
                     let lhs = self.visit_expression(Box::into_inner(lhs));
                     let rhs = self.visit_expression(Box::into_inner(rhs));
 
-                    // The result and result_type of a `CodeObject` returned
-                    // by an expression should never be `None`. An expression
-                    // should always evaluate to a result with a strong type.
-                    let result_type = ThreeAddressCodeVisitor::combined_result_type(
-                        lhs.result_type.unwrap(),
-                        rhs.result_type.unwrap(),
-                    );
                     let (curr_left_operand, mut left_code_seq) =
                         (lhs.result.unwrap(), lhs.code_sequence);
                     let (curr_right_operand, mut right_code_seq) =
                         (rhs.result.unwrap(), rhs.code_sequence);
 
                     let (curr_code, result_register) = match op {
-                        AddOp::Add => match result_type {
-                            ResultType::Int => {
+                        AddOp::Add => match (curr_left_operand, curr_right_operand) {
+                            (LValue::LValueI(left), LValue::LValueI(right)) => {
                                 let temp_result = TempI::new();
                                 (
                                     ThreeAddressCode::AddI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
-                            ResultType::Float => {
+                            (LValue::LValueF(left), LValue::LValueF(right)) => {
                                 let temp_result = TempF::new();
                                 (
                                     ThreeAddressCode::AddF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
+                            (left, right) => panic!(
+                                "Unsupported operands for Add. Left: [{:?}], Right: [{:?}]",
+                                left.result_type(), right.result_type()
+                            )
                         },
-                        AddOp::Sub => match result_type {
-                            ResultType::Int => {
+                        AddOp::Sub => match (curr_left_operand, curr_right_operand) {
+                            (LValue::LValueI(left), LValue::LValueI(right)) => {
                                 let temp_result = TempI::new();
                                 (
                                     ThreeAddressCode::SubI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
-                            ResultType::Float => {
+                            (LValue::LValueF(left), LValue::LValueF(right)) => {
                                 let temp_result = TempF::new();
                                 (
                                     ThreeAddressCode::SubF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
+                            (left, right) => panic!(
+                                "Unsupported operands for Sub. Left: [{:?}], Right: [{:?}]",
+                                left.result_type(), right.result_type()
+                            )
                         },
                     };
 
@@ -522,7 +519,6 @@ pub mod visit {
 
                     CodeObject::builder()
                         .result(result_register)
-                        .result_type(result_type)
                         .code_sequence(left_code_seq)
                         .build()
                 }
@@ -530,66 +526,67 @@ pub mod visit {
                     let lhs = self.visit_expression(Box::into_inner(lhs));
                     let rhs = self.visit_expression(Box::into_inner(rhs));
 
-                    // The result and result_type of a `CodeObject` returned
-                    // by an expression should never be `None`. An expression
-                    // should always evaluate to a result with a strong type.
-                    let result_type = ThreeAddressCodeVisitor::combined_result_type(
-                        lhs.result_type.unwrap(),
-                        rhs.result_type.unwrap(),
-                    );
                     let (curr_left_operand, mut left_code_seq) =
                         (lhs.result.unwrap(), lhs.code_sequence);
                     let (curr_right_operand, mut right_code_seq) =
                         (rhs.result.unwrap(), rhs.code_sequence);
 
                     let (curr_code, result_register) = match op {
-                        MulOp::Mul => match result_type {
-                            ResultType::Int => {
+                        MulOp::Mul => match (curr_left_operand, curr_right_operand) {
+                            (LValue::LValueI(left), LValue::LValueI(right)) => {
                                 let temp_result = TempI::new();
                                 (
                                     ThreeAddressCode::MulI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
-                            ResultType::Float => {
+                            (LValue::LValueF(left), LValue::LValueF(right)) => {
                                 let temp_result = TempF::new();
                                 (
                                     ThreeAddressCode::MulF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
+                            (left, right) => panic!(
+                                "Unsupported operands for Mul. Left: [{:?}], Right: [{:?}]",
+                                left.result_type(), right.result_type()
+                            )
                         },
-                        MulOp::Div => match result_type {
-                            ResultType::Int => {
+                        MulOp::Div => match (curr_left_operand, curr_right_operand) {
+                            (LValue::LValueI(left), LValue::LValueI(right)) => {
                                 let temp_result = TempI::new();
                                 (
                                     ThreeAddressCode::DivI {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
-                            ResultType::Float => {
+                            (LValue::LValueF(left), LValue::LValueF(right)) => {
                                 let temp_result = TempF::new();
                                 (
                                     ThreeAddressCode::DivF {
-                                        lhs: curr_left_operand,
-                                        rhs: curr_right_operand,
+                                        lhs: left.into(),
+                                        rhs: right.into(),
                                         temp_result,
                                     },
                                     temp_result.into(),
                                 )
                             }
+                            (left, right) => panic!(
+                                "Unsupported operands for Div. Left: [{:?}], Right: [{:?}]",
+                                left.result_type(), right.result_type()
+                            )
                         },
                     };
 
@@ -598,7 +595,6 @@ pub mod visit {
 
                     CodeObject::builder()
                         .result(result_register)
-                        .result_type(result_type)
                         .code_sequence(left_code_seq)
                         .build()
                 }
@@ -623,7 +619,12 @@ pub mod visit {
                             // a result with a strong type.
                             expr_code_obj.result.unwrap()
                         })
-                        .map(|arg| ThreeAddressCode::Push(arg))
+                        .map(|arg| {
+                            match arg {
+                                LValue::LValueI(arg) => ThreeAddressCode::PushI(arg.into()),
+                                LValue::LValueF(arg) => ThreeAddressCode::PushF(arg.into()),
+                            }
+                        })
                         .collect();
 
                     // If the function being called returns a value,
@@ -643,28 +644,27 @@ pub mod visit {
 
                     // If the function being called returns a value,
                     // pop the function call result and store it in a temporary.
-                    let (result_register, result_type) = match return_type {
+                    let result_register = match return_type {
                         ReturnType::Num(num_type) => match num_type {
                             NumType::Int => {
                                 let result_register = TempI::new();
                                 code_sequence
                                     .push(ThreeAddressCode::PopI(LValueI::Temp(result_register)));
-                                (Some(result_register.into()), Some(ResultType::Int))
+                                Some(result_register.into())
                             }
                             NumType::Float => {
                                 let result_register = TempF::new();
                                 code_sequence
                                     .push(ThreeAddressCode::PopF(LValueF::Temp(result_register)));
-                                (Some(result_register.into()), Some(ResultType::Float))
+                                Some(result_register.into())
                             }
                         },
-                        ReturnType::Void => (None, None),
+                        ReturnType::Void => None,
                     };
 
                     match return_type {
                         ReturnType::Num(_) => CodeObject::builder()
                             .result(result_register.unwrap())
-                            .result_type(result_type.unwrap())
                             .code_sequence(code_sequence)
                             .build(),
                         ReturnType::Void => {
@@ -683,7 +683,7 @@ pub mod visit {
 
             let rhs = self.visit_expression(rhs);
 
-            let (curr_operand, mut code_sequence) = (
+            let (result, mut code_sequence) = (
                 // The result of a `CodeObject` returned
                 // by an expression should never be `None`.
                 // An expression should always evaluate to
@@ -696,15 +696,19 @@ pub mod visit {
                 DataType::String => {
                     panic!("Unsupported operation: Cannot ASSIGN to a string identifier!")
                 }
-                DataType::Num(num_type) => match num_type {
-                    NumType::Int => ThreeAddressCode::StoreI {
+                DataType::Num(num_type) => match (num_type, result) {
+                    (NumType::Int, LValue::LValueI(result)) => ThreeAddressCode::StoreI {
                         lhs: LValueI::Id(IdentI(lhs.symbol)),
-                        rhs: curr_operand,
+                        rhs: result.into(),
                     },
-                    NumType::Float => ThreeAddressCode::StoreF {
+                    (NumType::Float, LValue::LValueF(result)) => ThreeAddressCode::StoreF {
                         lhs: LValueF::Id(IdentF(lhs.symbol)),
-                        rhs: curr_operand,
+                        rhs: result.into(),
                     },
+                    (_, result) => panic!(
+                        "Unsupported assignment. Cannot assign {:?} to {:?}",
+                        result.result_type(), num_type
+                    )
                 },
             };
 
@@ -718,91 +722,108 @@ pub mod visit {
 
             let lhs = self.visit_expression(lhs);
             let rhs = self.visit_expression(rhs);
-            // The result and result_type of a `CodeObject` returned
-            // by an expression should never be `None`. An expression
-            // should always evaluate to a result with a strong type.
-            let (left_result_type, right_result_type) =
-                (lhs.result_type.unwrap(), rhs.result_type.unwrap());
+
             let (curr_left_operand, mut left_code_seq) = (lhs.result.unwrap(), lhs.code_sequence);
             let (curr_right_operand, mut right_code_seq) = (rhs.result.unwrap(), rhs.code_sequence);
-
-            let comparison_type =
-                ThreeAddressCodeVisitor::combined_result_type(left_result_type, right_result_type);
 
             let else_label = Label::new();
 
             let curr_code = match cmp_op {
-                CmpOp::Lt => match comparison_type {
-                    ResultType::Int => GteI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Lt => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => GteI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => GteF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => GteF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
-                CmpOp::Gt => match comparison_type {
-                    ResultType::Int => LteI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Gt => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => LteI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => LteF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => LteF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
-                CmpOp::Eq => match comparison_type {
-                    ResultType::Int => NeI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Eq => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => NeI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => NeF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => NeF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
-                CmpOp::Ne => match comparison_type {
-                    ResultType::Int => EqI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Ne => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => EqI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => EqF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => EqF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
-                CmpOp::Lte => match comparison_type {
-                    ResultType::Int => GtI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Lte => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => GtI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => GtF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => GtF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
-                CmpOp::Gte => match comparison_type {
-                    ResultType::Int => LtI {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                CmpOp::Gte => match (curr_left_operand, curr_right_operand) {
+                    (LValue::LValueI(left), LValue::LValueI(right)) => LtI {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
-                    ResultType::Float => LtF {
-                        lhs: curr_left_operand,
-                        rhs: curr_right_operand,
+                    (LValue::LValueF(left), LValue::LValueF(right)) => LtF {
+                        lhs: left.into(),
+                        rhs: right.into(),
                         label: else_label,
                     },
+                    (left, right) => panic!(
+                        "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
+                        left.result_type(), right.result_type()
+                    )
                 },
             };
 
@@ -821,7 +842,7 @@ pub mod visit {
 mod test {
     use crate::ast::ast_node::{AddOp, AstNode, CmpOp, Condition, Expr, Identifier, MulOp};
     use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
-    use crate::three_addr_code_ir::ResultType;
+    use crate::three_addr_code_ir::{LValue, ResultType};
 
     use super::*;
     use crate::ast::ast_node;
@@ -875,9 +896,9 @@ mod test {
 
         assert!(matches!(
             code_object.result,
-            Some(BinaryExprOperand::LValueI(LValueI::Temp(_)))
+            Some(LValue::LValueI(LValueI::Temp(_)))
         ));
-        assert_eq!(ResultType::Int, code_object.result_type.unwrap());
+        assert_eq!(ResultType::Int, code_object.result_type().unwrap());
         assert_eq!(2, code_object.code_sequence.len());
     }
 
@@ -926,9 +947,9 @@ mod test {
 
         matches!(
             code_object.result,
-            Some(BinaryExprOperand::LValueF(LValueF::Temp(_)))
+            Some(LValue::LValueF(LValueF::Temp(_)))
         );
-        assert_eq!(ResultType::Float, code_object.result_type.unwrap());
+        assert_eq!(ResultType::Float, code_object.result_type().unwrap());
         assert_eq!(2, code_object.code_sequence.len());
     }
 

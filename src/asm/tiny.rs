@@ -7,7 +7,7 @@ use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-use crate::three_addr_code_ir::{BinaryExprOperand, LValueF, LValueI, RValue, TempF, TempI};
+use crate::three_addr_code_ir::{LValueF, LValueI, TempF, TempI, BinaryExprOperandI, BinaryExprOperandF};
 use atomic_refcell::AtomicRefCell;
 use std::fmt::Formatter;
 use std::rc::Rc;
@@ -226,29 +226,41 @@ pub enum TinyCode {
 }
 
 impl TinyCode {
-    fn binary_op_tac_operand_to_register_or_move(
-        operand: BinaryExprOperand,
+    fn integer_binary_op_tac_operand_to_register_or_move(
+        operand: BinaryExprOperandI,
     ) -> (Register, Option<TinyCode>) {
         match operand {
-            BinaryExprOperand::LValueI(LValueI::Temp(temp)) => {
+            BinaryExprOperandI::LValue(LValueI::Temp(temp)) => {
                 let register = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
-                (register, None)
-            }
-            BinaryExprOperand::LValueF(LValueF::Temp(temp)) => {
-                let register = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
                 (register, None)
             }
             _ => {
                 let (register, move_code) =
-                    TinyCode::move_binary_op_tac_operand_to_register(operand);
+                    TinyCode::move_integer_binary_op_tac_operand_to_register(operand);
                 (register, Some(move_code))
             }
         }
     }
 
-    fn move_binary_op_tac_operand_to_register(operand: BinaryExprOperand) -> (Register, TinyCode) {
+    fn float_binary_op_tac_operand_to_register_or_move(
+        operand: BinaryExprOperandF,
+    ) -> (Register, Option<TinyCode>) {
         match operand {
-            BinaryExprOperand::LValueI(lval) => match lval {
+            BinaryExprOperandF::LValue(LValueF::Temp(temp)) => {
+                let register = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
+                (register, None)
+            }
+            _ => {
+                let (register, move_code) =
+                    TinyCode::move_float_binary_op_tac_operand_to_register(operand);
+                (register, Some(move_code))
+            }
+        }
+    }
+
+    fn move_integer_binary_op_tac_operand_to_register(operand: BinaryExprOperandI) -> (Register, TinyCode) {
+        match operand {
+            BinaryExprOperandI::LValue(lval) => match lval {
                 LValueI::Temp(temp) => {
                     let existing_reg = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     let new_reg = Register::new();
@@ -271,7 +283,19 @@ impl TinyCode {
                     )
                 }
             },
-            BinaryExprOperand::LValueF(lval) => match lval {
+            BinaryExprOperandI::RValue(n) => {
+                let new_reg = Register::new();
+                (
+                    new_reg,
+                    TinyCode::Move(OpmrL::Int(OpmrIL::Literal(n)), Opmr::Reg(new_reg)),
+                )
+            },
+        }
+    }
+
+    fn move_float_binary_op_tac_operand_to_register(operand: BinaryExprOperandF) -> (Register, TinyCode) {
+        match operand {
+            BinaryExprOperandF::LValue(lval) => match lval {
                 LValueF::Temp(temp) => {
                     let existing_reg = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     let new_reg = Register::new();
@@ -294,46 +318,41 @@ impl TinyCode {
                     )
                 }
             },
-            BinaryExprOperand::RValue(rval) => match rval {
-                RValue::IntLiteral(n) => {
-                    let new_reg = Register::new();
-                    (
-                        new_reg,
-                        TinyCode::Move(OpmrL::Int(OpmrIL::Literal(n)), Opmr::Reg(new_reg)),
-                    )
-                }
-                RValue::FloatLiteral(n) => {
-                    let new_reg = Register::new();
-                    (
-                        new_reg,
-                        TinyCode::Move(OpmrL::Float(OpmrFL::Literal(n)), Opmr::Reg(new_reg)),
-                    )
-                }
+            BinaryExprOperandF::RValue(n) => {
+                let new_reg = Register::new();
+                (
+                    new_reg,
+                    TinyCode::Move(OpmrL::Float(OpmrFL::Literal(n)), Opmr::Reg(new_reg)),
+                )
             },
         }
     }
 
     // TODO [idiomatic rust]: Can this be changed to TryFrom impls
-    fn binary_op_tac_operand_to_opmrl(operand: BinaryExprOperand) -> OpmrL {
+    fn integer_binary_op_tac_operand_to_opmrl(operand: BinaryExprOperandI) -> OpmrL {
         match operand {
-            BinaryExprOperand::LValueI(lval) => match lval {
+            BinaryExprOperandI::LValue(lval) => match lval {
                 LValueI::Temp(temp) => {
                     let existing_reg = *INT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     OpmrL::Int(OpmrIL::Location(Opmr::Reg(existing_reg)))
                 }
                 LValueI::Id(id) => OpmrL::Int(OpmrIL::Location(Opmr::Id(id.0))),
             },
-            BinaryExprOperand::LValueF(lval) => match lval {
+            BinaryExprOperandI::RValue(n) => OpmrL::Int(OpmrIL::Literal(n)),
+        }
+    }
+
+    // TODO [idiomatic rust]: Can this be changed to TryFrom impls
+    fn float_binary_op_tac_operand_to_opmrl(operand: BinaryExprOperandF) -> OpmrL {
+        match operand {
+            BinaryExprOperandF::LValue(lval) => match lval {
                 LValueF::Temp(temp) => {
                     let existing_reg = *FLOAT_REGISTER_MAP.borrow().get(&temp).unwrap();
                     OpmrL::Float(OpmrFL::Location(Opmr::Reg(existing_reg)))
                 }
                 LValueF::Id(id) => OpmrL::Float(OpmrFL::Location(Opmr::Id(id.0))),
             },
-            BinaryExprOperand::RValue(rval) => match rval {
-                RValue::IntLiteral(n) => OpmrL::Int(OpmrIL::Literal(n)),
-                RValue::FloatLiteral(n) => OpmrL::Float(OpmrFL::Literal(n)),
-            },
+            BinaryExprOperandF::RValue(n) => OpmrL::Float(OpmrFL::Literal(n)),
         }
     }
 }
@@ -352,8 +371,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::integer_binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
                 let add_code = TinyCode::AddI(operand2, operand1);
 
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -372,8 +391,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::integer_binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
                 let sub_code = TinyCode::SubI(operand2, operand1);
 
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -392,8 +411,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::integer_binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
                 let mul_code = TinyCode::MulI(operand2, operand1);
 
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -412,8 +431,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::integer_binary_op_tac_operand_to_opmrl(rhs).into_int_opmrl();
                 let div_code = TinyCode::DivI(operand2, operand1);
 
                 INT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -449,14 +468,14 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 };
 
                 if !is_lhs_mem_ref || !rhs.is_mem_ref() {
-                    let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs);
+                    let operand2 = TinyCode::integer_binary_op_tac_operand_to_opmrl(rhs);
                     let move_code = TinyCode::Move(operand2, operand1);
                     TinyCodeSequence {
                         sequence: vec![move_code],
                     }
                 } else {
                     let (operand2, operand_move_code) =
-                        TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                        TinyCode::move_integer_binary_op_tac_operand_to_register(rhs);
                     let move_code =
                         TinyCode::Move(OpmrL::Int(OpmrIL::Location(Opmr::Reg(operand2))), operand1);
                     TinyCodeSequence {
@@ -476,8 +495,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::float_binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
                 let add_code = TinyCode::AddF(operand2, operand1);
 
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -496,8 +515,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::float_binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
                 let sub_code = TinyCode::SubF(operand2, operand1);
 
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -516,8 +535,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::float_binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
                 let mul_code = TinyCode::MulF(operand2, operand1);
 
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -536,8 +555,8 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 temp_result: temporary,
             } => {
                 let (operand1, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(lhs);
-                let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(lhs);
+                let operand2 = TinyCode::float_binary_op_tac_operand_to_opmrl(rhs).into_float_opmrl();
                 let div_code = TinyCode::DivF(operand2, operand1);
 
                 FLOAT_REGISTER_MAP.borrow_mut().insert(temporary, operand1);
@@ -573,14 +592,14 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 };
 
                 if !is_lhs_mem_ref || !rhs.is_mem_ref() {
-                    let operand2 = TinyCode::binary_op_tac_operand_to_opmrl(rhs);
+                    let operand2 = TinyCode::float_binary_op_tac_operand_to_opmrl(rhs);
                     let move_code = TinyCode::Move(operand2, operand1);
                     TinyCodeSequence {
                         sequence: vec![move_code],
                     }
                 } else {
                     let (operand2, operand_move_code) =
-                        TinyCode::move_binary_op_tac_operand_to_register(rhs);
+                        TinyCode::move_float_binary_op_tac_operand_to_register(rhs);
                     let move_code = TinyCode::Move(
                         OpmrL::Float(OpmrFL::Location(Opmr::Reg(operand2))),
                         operand1,
@@ -606,9 +625,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 sequence: vec![TinyCode::Jmp(label.into())],
             },
             ThreeAddressCode::GtI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jgt(label.into());
@@ -622,9 +641,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::LtI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jlt(label.into());
@@ -638,9 +657,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::GteI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jge(label.into());
@@ -654,9 +673,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::LteI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jle(label.into());
@@ -670,9 +689,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::NeI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jne(label.into());
@@ -686,9 +705,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::EqI { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::integer_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::integer_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpI(operand1.into_int_opmrl(), operand2);
                 let jump_code = TinyCode::Jeq(label.into());
@@ -702,9 +721,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::GtF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jgt(label.into());
@@ -718,9 +737,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::LtF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jlt(label.into());
@@ -734,9 +753,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::GteF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jge(label.into());
@@ -750,9 +769,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::LteF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jle(label.into());
@@ -766,9 +785,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::NeF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jne(label.into());
@@ -782,9 +801,9 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
                 }
             }
             ThreeAddressCode::EqF { lhs, rhs, label } => {
-                let operand1 = TinyCode::binary_op_tac_operand_to_opmrl(lhs);
+                let operand1 = TinyCode::float_binary_op_tac_operand_to_opmrl(lhs);
                 let (operand2, move_code) =
-                    TinyCode::binary_op_tac_operand_to_register_or_move(rhs);
+                    TinyCode::float_binary_op_tac_operand_to_register_or_move(rhs);
 
                 let cmp_code = TinyCode::CmpF(operand1.into_float_opmrl(), operand2);
                 let jump_code = TinyCode::Jeq(label.into());
@@ -800,8 +819,13 @@ impl From<ThreeAddressCode> for TinyCodeSequence {
             ThreeAddressCode::PushEmpty => TinyCodeSequence {
                 sequence: vec![TinyCode::PushEmpty],
             },
-            ThreeAddressCode::Push(operand) => TinyCodeSequence {
-                sequence: vec![TinyCode::Push(TinyCode::binary_op_tac_operand_to_opmrl(
+            ThreeAddressCode::PushI(operand) => TinyCodeSequence {
+                sequence: vec![TinyCode::Push(TinyCode::integer_binary_op_tac_operand_to_opmrl(
+                    operand,
+                ))],
+            },
+            ThreeAddressCode::PushF(operand) => TinyCodeSequence {
+                sequence: vec![TinyCode::Push(TinyCode::float_binary_op_tac_operand_to_opmrl(
                     operand,
                 ))],
             },
