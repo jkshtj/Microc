@@ -126,6 +126,10 @@ impl ImmutableBasicBlock {
         // always contain at least one 3AC.
         self.seq().last().unwrap()
     }
+
+    pub fn into_parts(self) -> (BBLabel, Vec<ThreeAddressCode>) {
+        (self.label, self.seq)
+    }
 }
 
 impl From<BasicBlock> for ImmutableBasicBlock {
@@ -273,7 +277,7 @@ mod test {
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
     use crate::three_addr_code_ir::{LValueI, reset_label_counter};
-    use crate::three_addr_code_ir::{BinaryExprOperand, FunctionIdent, IdentI, RValue, TempI};
+    use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, TempI};
     use linked_hash_map::LinkedHashMap;
     use std::collections::HashMap;
     use std::rc::Rc;
@@ -361,43 +365,43 @@ mod test {
                     // STOREI 4, $t1
                     StoreI {
                         lhs: LValueI::Temp(t1),
-                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(4)),
+                        rhs: BinaryExprOperandI::RValue(4),
                     },
                     // STOREI $t1 a
                     StoreI {
                         lhs: LValueI::Id(a.clone()),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t1)),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
                     },
                     // STOREI 2 $T2
                     StoreI {
                         lhs: LValueI::Temp(t2),
-                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(2)),
+                        rhs: BinaryExprOperandI::RValue(2),
                     },
                     // STOREI $T2 b
                     StoreI {
                         lhs: LValueI::Id(b.clone()),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t2)),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
                     },
                     // MULTI a b $T3
                     MulI {
-                        lhs: BinaryExprOperand::LValueI(LValueI::Id(a.clone())),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Id(b.clone())),
+                        lhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
                         temp_result: t3,
                     },
                     // STOREI $T3 p
                     StoreI {
                         lhs: LValueI::Id(p.clone()),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t3)),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t3)),
                     },
                     // STOREI 10 $T4
                     StoreI {
                         lhs: LValueI::Temp(t4),
-                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(10)),
+                        rhs: BinaryExprOperandI::RValue(10),
                     },
                     // LE p $T4 label1
                     LteI {
-                        lhs: BinaryExprOperand::LValueI(LValueI::Id(p.clone())),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t4)),
+                        lhs: BinaryExprOperandI::LValue(LValueI::Id(p.clone())),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t4)),
                         label: tac_label1,
                     },
                 ],
@@ -413,12 +417,12 @@ mod test {
                     // STOREI 42 $T5
                     StoreI {
                         lhs: LValueI::Temp(t5),
-                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(42)),
+                        rhs: BinaryExprOperandI::RValue(42),
                     },
                     // STOREI $T5 i
                     StoreI {
                         lhs: LValueI::Id(i.clone()),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t5)),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t5)),
                     },
                     // JUMP label2
                     Jump(tac_label2),
@@ -437,12 +441,12 @@ mod test {
                     // STOREI 24 $T6
                     StoreI {
                         lhs: LValueI::Temp(t6),
-                        rhs: BinaryExprOperand::RValue(RValue::IntLiteral(24)),
+                        rhs: BinaryExprOperandI::RValue(24),
                     },
                     // STOREI $T6 i
                     StoreI {
                         lhs: LValueI::Id(i.clone()),
-                        rhs: BinaryExprOperand::LValueI(LValueI::Temp(t6)),
+                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t6)),
                     },
                     // JUMP label2
                     Jump(tac_label2),

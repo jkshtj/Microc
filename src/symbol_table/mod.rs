@@ -5,6 +5,9 @@ pub mod scope;
 pub mod scope_tree;
 pub mod symbol;
 
+#[cfg(test)]
+pub use test::setup as symbol_table_test_setup;
+
 use crate::symbol_table::error::{
     DeclareExistingSymbolError, SymbolError, UseUndeclaredSymbolError,
 };
@@ -230,7 +233,7 @@ mod test {
     use crate::token::{Token, TokenType};
     use serial_test::serial;
 
-    fn setup() {
+    pub fn setup() {
         SYMBOL_TABLE.with(|symbol_table| {
             let mut symbol_table = symbol_table.borrow_mut();
 

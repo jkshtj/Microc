@@ -24,6 +24,18 @@ pub mod data {
         FunctionScopedSymbol(Rc<FunctionScopedSymbol>),
     }
 
+    impl From<Rc<NonFunctionScopedSymbol>> for Symbol {
+        fn from(symbol: Rc<NonFunctionScopedSymbol>) -> Self {
+            Symbol::NonFunctionScopedSymbol(symbol)
+        }
+    }
+
+    impl From<Rc<FunctionScopedSymbol>> for Symbol {
+        fn from(symbol: Rc<FunctionScopedSymbol>) -> Self {
+            Symbol::FunctionScopedSymbol(symbol)
+        }
+    }
+
     /// Represents a symbol declared in the global
     /// scope or an anonymous scope (if blocks, for loops etc.),
     /// in the program to represent data - string, int or a float.
@@ -43,6 +55,14 @@ pub mod data {
                 NonFunctionScopedSymbol::String { name, value } => name,
                 NonFunctionScopedSymbol::Int { name } => name,
                 NonFunctionScopedSymbol::Float { name } => name,
+            }
+        }
+
+        pub fn data_type(&self) -> DataType {
+            match self {
+                NonFunctionScopedSymbol::String { .. } => DataType::String,
+                NonFunctionScopedSymbol::Int { .. } => DataType::Num(NumType::Int),
+                NonFunctionScopedSymbol::Float { .. } => DataType::Num(NumType::Float),
             }
         }
     }
