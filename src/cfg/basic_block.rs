@@ -66,29 +66,29 @@ impl BasicBlock {
     pub fn is_empty(&self) -> bool {
         self.seq.is_empty()
     }
+}
 
-    /// Determines whether a given 3AC is a basic block
-    /// terminator. All branch/jump and return 3ACs can
-    /// be basic block terminators.
-    pub fn is_bb_terminator(tac: &ThreeAddressCode) -> bool {
-        match tac {
-            // Unconditional jump
-            ThreeAddressCode::Jump(_)
-            // Conditional jump
-            | ThreeAddressCode::GtI { .. }
-            | ThreeAddressCode::LtI { .. }
-            | ThreeAddressCode::GteI { .. }
-            | ThreeAddressCode::LteI { .. }
-            | ThreeAddressCode::NeI { .. }
-            | ThreeAddressCode::EqI { .. }
-            | ThreeAddressCode::GtF { .. }
-            | ThreeAddressCode::LtF { .. }
-            | ThreeAddressCode::GteF { .. }
-            | ThreeAddressCode::LteF { .. }
-            | ThreeAddressCode::NeF { .. }
-            | ThreeAddressCode::EqF { .. } => true,
-            _ => false,
-        }
+/// Determines whether a given 3AC is a basic block
+/// terminator. All branch/jump and return 3ACs can
+/// be basic block terminators.
+pub fn is_bb_terminator(tac: &ThreeAddressCode) -> bool {
+    match tac {
+        // Unconditional jump
+        ThreeAddressCode::Jump(_)
+        // Conditional jump
+        | ThreeAddressCode::GtI { .. }
+        | ThreeAddressCode::LtI { .. }
+        | ThreeAddressCode::GteI { .. }
+        | ThreeAddressCode::LteI { .. }
+        | ThreeAddressCode::NeI { .. }
+        | ThreeAddressCode::EqI { .. }
+        | ThreeAddressCode::GtF { .. }
+        | ThreeAddressCode::LtF { .. }
+        | ThreeAddressCode::GteF { .. }
+        | ThreeAddressCode::LteF { .. }
+        | ThreeAddressCode::NeF { .. }
+        | ThreeAddressCode::EqF { .. } => true,
+        _ => false,
     }
 }
 
@@ -223,7 +223,7 @@ impl From<CodeObject> for BBFunction {
         let mut func = BBFunction::new();
         let mut curr_bb = BasicBlock::new();
         for tac in code_object.code_sequence {
-            if BasicBlock::is_bb_terminator(&tac) {
+            if is_bb_terminator(&tac) {
                 // If the this 3AC is a conditional or unconditional
                 // jump code then the we need to add the jump 3AC to
                 // the current bb, close the current bb and then

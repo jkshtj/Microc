@@ -24,7 +24,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
-use crate::cfg::liveness::GenKillDecoratedControlFlowGraph;
+use crate::cfg::liveness::LivenessDecoratedControlFlowGraph;
 
 lalrpop_mod!(pub microc);
 
@@ -107,7 +107,7 @@ fn main() {
             .into_iter()
             .map(|ast_node| visitor.walk_ast(ast_node))
             .map(|code_object| ControlFlowGraph::from(Into::<BBFunction>::into(code_object)))
-            .map(|cfg| GenKillDecoratedControlFlowGraph::from(cfg))
+            .map(|cfg| LivenessDecoratedControlFlowGraph::from(cfg))
             .for_each(|x| println!("{x}"));
 
         // let tiny_code: TinyCodeSequence = three_addr_codes.into();
