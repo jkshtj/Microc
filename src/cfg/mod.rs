@@ -35,6 +35,7 @@ impl Display for ControlFlowGraph {
 }
 
 impl ControlFlowGraph {
+    #[cfg(test)]
     pub fn new(
         bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>,
         bbs: LinkedHashMap<BBLabel, ImmutableBasicBlock>,

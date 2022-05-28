@@ -8,33 +8,66 @@ use crate::symbol_table::SymbolTable;
 use crate::symbol_table::symbol::data::DataType;
 use crate::symbol_table::symbol::{NumType, data};
 use std::fmt::{Display, Formatter};
+use std::cell::RefCell;
+use typed_builder::TypedBuilder;
+use std::rc::Rc;
 
-/// ThreeAddressCode nodes containing GEN, KILL, IN
-/// and OUT sets for the current 3AC node.
+/// Represent the GEN, KILL, IN and OUT
+/// sets associated to a 3AC node.
+#[derive(Debug,PartialEq, TypedBuilder)]
+#[builder(field_defaults(default, setter(transform = |x: HashSet<LValue>| Rc::new(RefCell::new(x)))))]
+struct LivenessMetadata {
+    gen_set: Rc<RefCell<HashSet<LValue>>>,
+    kill_set: Rc<RefCell<HashSet<LValue>>>,
+    in_set: Rc<RefCell<HashSet<LValue>>>,
+    out_set: Rc<RefCell<HashSet<LValue>>>,
+}
+
+impl LivenessMetadata {
+    // TODO: Create a new to prevent leaking details
+    // about the inner types, so that I could return something
+    // like `impl TRAIT` instead of the concrete types I'm using
+    // inside of `LivenessMetadata`.
+    pub fn gen_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        Rc::clone(&self.gen_set)
+    }
+
+    pub fn kill_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        Rc::clone(&self.kill_set)
+    }
+
+    pub fn in_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        Rc::clone(&self.in_set)
+    }
+
+    pub fn out_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        Rc::clone(&self.out_set)
+    }
+}
+
+/// ThreeAddressCode nodes containing liveness
+/// metadata for the current 3AC node.
 #[derive(Debug, PartialEq)]
 pub struct LivenessDecoratedThreeAddressCode {
     tac: ThreeAddressCode,
-    gen_set: HashSet<LValue>,
-    kill_set: HashSet<LValue>,
-    in_set: HashSet<LValue>,
-    out_set: HashSet<LValue>,
+    liveness_metadata: LivenessMetadata,
 }
 
 impl LivenessDecoratedThreeAddressCode {
-    pub fn gen_set(&self) -> impl Iterator<Item=&LValue> {
-        self.gen_set.iter()
+    pub fn gen_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        self.liveness_metadata.gen_set()
     }
 
-    pub fn kill_set(&self) -> impl Iterator<Item=&LValue> {
-        self.kill_set.iter()
+    pub fn kill_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        self.liveness_metadata.kill_set()
     }
 
-    pub fn in_set(&self) -> impl Iterator<Item=&LValue> {
-        self.in_set.iter()
+    pub fn in_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        self.liveness_metadata.in_set()
     }
 
-    pub fn out_set(&self) -> impl Iterator<Item=&LValue> {
-        self.out_set.iter()
+    pub fn out_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
+        self.liveness_metadata.out_set()
     }
 
     pub fn tac(&self) -> &ThreeAddressCode {
@@ -180,10 +213,11 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
 
         LivenessDecoratedThreeAddressCode {
             tac,
-            gen_set,
-            kill_set,
-            in_set: HashSet::new(),
-            out_set,
+            liveness_metadata: LivenessMetadata::builder()
+                .gen_set(gen_set)
+                .kill_set(kill_set)
+                .out_set(out_set)
+                .build(),
         }
     }
 }
@@ -192,9 +226,13 @@ impl Display for LivenessDecoratedThreeAddressCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.tac())?;
         write!(f, "     | GEN: ")?;
-        self.gen_set().try_for_each(|x| write!(f, "{x} "))?;
+        self.gen_set().borrow().iter().try_for_each(|x| write!(f, "{x}, "))?;
         write!(f, "     | KILL: ")?;
-        self.kill_set().try_for_each(|x| write!(f, "{x} "))
+        self.kill_set().borrow().iter().try_for_each(|x| write!(f, "{x}, "))?;
+        write!(f, "     | IN: ")?;
+        self.in_set().borrow().iter().try_for_each(|x| write!(f, "{x}, "))?;
+        write!(f, "     | OUT: ")?;
+        self.out_set().borrow().iter().try_for_each(|x| write!(f, "{x}, "))
     }
 }
 
@@ -216,26 +254,13 @@ impl LivenessDecoratedImmutableBasicBlock {
         &self.seq
     }
 
-    pub fn seq_mut(&mut self) -> &mut [LivenessDecoratedThreeAddressCode] {
-        &mut self.seq
-    }
-
     fn first(&self) -> &LivenessDecoratedThreeAddressCode {
         // A basic block is guaranteed to never be empty
         &self.seq[0]
     }
 
-    fn last(&self) -> &LivenessDecoratedThreeAddressCode {
-        // A basic block is guaranteed to never be empty
-        &self.seq[self.seq.len()-1]
-    }
-
-    pub fn in_set(&self) -> impl Iterator<Item = &LValue> {
+    pub fn in_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
         self.first().in_set()
-    }
-
-    pub fn out_set(&self) -> impl Iterator<Item = &LValue> {
-        self.last().out_set()
     }
 }
 
@@ -278,10 +303,6 @@ impl LivenessDecoratedControlFlowGraph {
         self.bbs.iter()
     }
 
-    pub fn basic_blocks_mut(&mut self) -> impl Iterator<Item = (&BBLabel, &mut LivenessDecoratedImmutableBasicBlock)> {
-        self.bbs.iter_mut()
-    }
-
     pub fn basic_block_map(&self) -> impl Iterator<Item = (&BBLabel, &Vec<BBLabel>)> {
         self.bb_map.iter()
     }
@@ -299,63 +320,87 @@ impl LivenessDecoratedControlFlowGraph {
     pub fn update_in_and_out_sets(&mut self) {
         /*
         1. Put all of the IR nodes on the worklist
-        2. Pull an IR node off the worklist, and compute its live-out and live-in sets according to the definitions above.
-        3. If the live-in set of the node gets updated by the previous step, put all of the node's predecessors on the worklist (because they may need to update their live-out sets).
+        2. Pull an IR node off the worklist, and compute its OUT and IN sets.
+        3. If the IN or OUT sets of the node get updated by the previous step, put all nodes back on the worklist.
         4. Repeat steps 2 and 3 until the worklist is empty.
         */
         loop {
-            let mut worklist: Vec<(BBLabel, &mut LivenessDecoratedThreeAddressCode)> = self.basic_blocks_mut()
-                .flat_map(|(bb_label, bb)| bb.seq_mut()
-                    .iter_mut()
-                    .map(move |tac| (*bb_label, tac))
-                )
-                .collect();
+            let worklist: Vec<(BBLabel, &LivenessDecoratedThreeAddressCode)> = {
+                let mut worklist = self.basic_blocks()
+                    .flat_map(|(bb_label, bb)| bb.seq()
+                        .iter()
+                        .map(move |tac| (*bb_label, tac))
+                    )
+                    .collect::<Vec<(BBLabel, &LivenessDecoratedThreeAddressCode)>>();
 
-            // We cannot reverse the iterator before collecting worklist
-            // items into a Vec because an iterator needs to implement
-            // `DoubleEndedIterator` in order for it to be reversed. An
-            // iterator created from a `LinkedHashMap` does not implement
-            // the `DoubleEndedIterator` trait.
-            worklist.reverse();
+                // We cannot reverse the iterator before collecting worklist
+                // items into a Vec because an iterator needs to implement
+                // `DoubleEndedIterator` in order for it to be reversed. An
+                // iterator created from a `LinkedHashMap` does not implement
+                // the `DoubleEndedIterator` trait.
+                worklist.reverse();
+
+                worklist
+            };
 
             let mut updated = false;
-            let mut successor_tac_node_in_set = HashSet::new();
+            let mut successor_tac_node_in_set: HashSet<LValue> = HashSet::new();
 
             for (bb_label, tac) in worklist {
                 // Find current nodes successors. Two things -
-                // 1. Since we are iterating the 3AC instructions fot the
-                // function in the reverse direction, the current node's successor
-                // is stored in the `prev` variable declared above.
+                // 1. Since we are iterating the 3AC instructions for the
+                // function in the reverse direction, the current node's successor's
+                // IN set is stored in the `successor_tac_node_in_set` variable
+                // declared above.
                 //
-                // 2. If this is not a bb terminator, then `prev` may be the only successor
-                // for the current node. Otherwise, the node will have successors in addition
-                // to or other than `prev`.
+                // 2. If this is a bb terminator then the current 3AC node may
+                // have multiple successors.
                 let mut out_set = HashSet::new();
 
                 // If the current 3AC is not an unconditional jump then the
                 // successor 3AC node's (which we actually visited in the previous
-                // loop pass) in_set is part of the current 3AC node's out_set.
+                // loop pass) IN set is part of the current 3AC node's OUT
+                // set.
                 if !tac.tac().is_unconditional_branch() {
                     out_set.extend(successor_tac_node_in_set);
                 }
 
                 // If this is a bb terminator then this 3AC node is
-                // going to have other successors that are the leaders
-                // of the children bbs.
+                // going to have multiple successors, that are the leaders
+                // of other bbs in the function. We will use the IN sets
+                // of those leaders to find/update this node's OUT set.
                 if is_bb_terminator(tac.tac()) {
                     if let Some(neighbors_of_bb) =  self.neighbors_of_bb(&bb_label) {
                         for neighboring_bb in neighbors_of_bb {
                             if let Some(neighbor) = self.basic_block_for_label(neighboring_bb) {
-                                out_set.extend(neighbor.in_set().cloned())
+                                out_set.extend(neighbor.in_set().borrow().clone())
                             }
                         }
                     }
                 }
 
-                // let in_set = (tac.out_set - tac.kill_set) U tac.gen_set
-                // if in_set != tac.in_set => updated = true
-                // Update previous
-                successor_tac_node_in_set = HashSet::new();
+                // Calculate the IN set for the current node.
+                // IN = (OUT - KILL) U GEN
+                let out_set_minus_kill_set = &out_set - &*tac.kill_set().borrow();
+                let in_set = &out_set_minus_kill_set | &*tac.gen_set().borrow();
+
+                let out_set_changed = &out_set != &*tac.out_set().borrow();
+                let in_set_changed = &in_set != &*tac.in_set().borrow();
+
+                if out_set_changed {
+                    tac.out_set().borrow_mut().extend(out_set);
+                }
+
+                if in_set_changed {
+                    tac.in_set().borrow_mut().extend(in_set.clone());
+                }
+
+                // `updated` is true if it has _once_ been set to true, or
+                // if the current node's OUT or IN sets have changed.
+                updated = updated || out_set_changed || in_set_changed;
+
+                // Update successor_tac_node_in_set = in_set
+                successor_tac_node_in_set = in_set;
             }
 
             if !updated {
@@ -400,7 +445,7 @@ mod test {
     use crate::symbol_table::symbol::{data, function};
     use std::rc::Rc;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::cfg::liveness::{LivenessDecoratedImmutableBasicBlock, LivenessDecoratedThreeAddressCode, LValue};
+    use crate::cfg::liveness::{LivenessDecoratedImmutableBasicBlock, LivenessDecoratedThreeAddressCode, LValue, LivenessMetadata};
     use std::collections::HashSet;
     use crate::symbol_table::{symbol_table_test_setup, SymbolTable};
     use crate::symbol_table::symbol::function::ReturnType;
@@ -422,27 +467,25 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::PushI (BinaryExprOperandI::LValue(LValueI::Id(a.clone()))),
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
-                        gen
-                    },
-                    kill_set: HashSet::new(),
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                            gen
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 
     #[test]
@@ -461,27 +504,25 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::PopI(LValueI::Id(a.clone())),
-                    gen_set: HashSet::new(),
-                    kill_set: {
-                        let mut kill = HashSet::new();
-                        kill.insert(LValue::LValueI(LValueI::Id(a.clone())));
-                        kill
-                    },
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .kill_set({
+                            let mut kill = HashSet::new();
+                            kill.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                            kill
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 
     #[test]
@@ -502,29 +543,27 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::WriteI {
                         identifier: a.clone(),
                     },
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
-                        gen
-                    },
-                    kill_set: HashSet::new(),
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                            gen
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 
     #[test]
@@ -545,29 +584,27 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::ReadI {
                         identifier: a.clone(),
                     },
-                    gen_set: HashSet::new(),
-                    kill_set: {
-                        let mut kill = HashSet::new();
-                        kill.insert(LValue::LValueI(LValueI::Id(a.clone())));
-                        kill
-                    },
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .kill_set({
+                            let mut kill = HashSet::new();
+                            kill.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                            kill
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 
     #[test]
@@ -600,29 +637,27 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::Jsr(function_ident.clone()),
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(a.clone()).into()))));
-                        gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(b.clone()).into()))));
-                        gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(c.clone()).into()))));
-                        gen
-                    },
-                    kill_set: HashSet::new(),
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(a.clone()).into()))));
+                            gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(b.clone()).into()))));
+                            gen.insert(LValue::LValueI(LValueI::Id(IdentI(Rc::new(c.clone()).into()))));
+                            gen
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 
     #[test]
@@ -671,8 +706,8 @@ mod test {
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
-        // Expected `GenKillDecoratedImmutableBasicBlock`
-        let expected_gen_kill_decorated_bb = LivenessDecoratedImmutableBasicBlock {
+        // Expected `LivenessDecoratedImmutableBasicBlock`
+        let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
@@ -681,19 +716,18 @@ mod test {
                         rhs: BinaryExprOperandI::LValue(LValueI::Id(c.clone())),
                         temp_result: t1,
                     },
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Id(b.clone())));
-                        gen.insert(LValue::LValueI(LValueI::Id(c.clone())));
-                        gen
-                    },
-                    kill_set: {
-                        let mut kill = HashSet::new();
-                        kill.insert(LValue::LValueI(LValueI::Temp(t1)));
-                        kill
-                    },
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Id(b.clone())));
+                            gen.insert(LValue::LValueI(LValueI::Id(c.clone())));
+                            gen
+                        })
+                        .kill_set({
+                            let mut kill = HashSet::new();
+                            kill.insert(LValue::LValueI(LValueI::Temp(t1)));
+                            kill
+                        }).build(),
                 },
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::AddI {
@@ -701,43 +735,41 @@ mod test {
                         rhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
                         temp_result: t2,
                     },
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Temp(t1)));
-                        gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
-                        gen
-                    },
-                    kill_set: {
-                        let mut kill = HashSet::new();
-                        kill.insert(LValue::LValueI(LValueI::Temp(t2)));
-                        kill
-                    },
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Temp(t1)));
+                            gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                            gen
+                        })
+                        .kill_set({
+                            let mut kill = HashSet::new();
+                            kill.insert(LValue::LValueI(LValueI::Temp(t2)));
+                            kill
+                        }).build(),
                 },
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::StoreI {
                         lhs: LValueI::Id(d.clone()),
                         rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2))
                     },
-                    gen_set: {
-                        let mut gen = HashSet::new();
-                        gen.insert(LValue::LValueI(LValueI::Temp(t2)));
-                        gen
-                    },
-                    kill_set: {
-                        let mut kill = HashSet::new();
-                        kill.insert(LValue::LValueI(LValueI::Id(d.clone())));
-                        kill
-                    },
-                    in_set: HashSet::new(),
-                    out_set: HashSet::new(),
+                    liveness_metadata: LivenessMetadata::builder()
+                        .gen_set({
+                            let mut gen = HashSet::new();
+                            gen.insert(LValue::LValueI(LValueI::Temp(t2)));
+                            gen
+                        })
+                        .kill_set({
+                            let mut kill = HashSet::new();
+                            kill.insert(LValue::LValueI(LValueI::Id(d.clone())));
+                            kill
+                        }).build(),
                 },
             ]
         };
 
-        // Actual `GenKillDecoratedImmutableBasicBlock`
-        let actual_gen_kill_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
-        assert_eq!(expected_gen_kill_decorated_bb, actual_gen_kill_decorated_bb);
+        // Actual `LivenessDecoratedImmutableBasicBlock`
+        let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock = immutable_bb.into();
+        assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
     }
 }

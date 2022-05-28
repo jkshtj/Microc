@@ -107,7 +107,11 @@ fn main() {
             .into_iter()
             .map(|ast_node| visitor.walk_ast(ast_node))
             .map(|code_object| ControlFlowGraph::from(Into::<BBFunction>::into(code_object)))
-            .map(|cfg| LivenessDecoratedControlFlowGraph::from(cfg))
+            .map(|cfg| {
+                let mut cfg = LivenessDecoratedControlFlowGraph::from(cfg);
+                cfg.update_in_and_out_sets();
+                cfg
+            })
             .for_each(|x| println!("{x}"));
 
         // let tiny_code: TinyCodeSequence = three_addr_codes.into();
