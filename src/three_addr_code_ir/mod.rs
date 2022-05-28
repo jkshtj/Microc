@@ -171,7 +171,6 @@ impl From<IdentF> for LValue {
     }
 }
 
-
 /// Integer type binary expression operand
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
 pub enum BinaryExprOperandI {

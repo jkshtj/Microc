@@ -195,7 +195,9 @@ impl BBFunction {
         self.bbs.values()
     }
 
-    pub fn tac_label_to_bb_label_mappings(&self) -> impl Iterator<Item = (&ThreeAddrCodeLabel, &BBLabel)> {
+    pub fn tac_label_to_bb_label_mappings(
+        &self,
+    ) -> impl Iterator<Item = (&ThreeAddrCodeLabel, &BBLabel)> {
         self.tac_label_to_bb_label.iter()
     }
 
@@ -203,7 +205,11 @@ impl BBFunction {
         self.bbs.insert(bb.label(), bb.into());
     }
 
-    pub fn add_tac_label_to_bb_label_mapping(&mut self, tac_label: ThreeAddrCodeLabel, bb_label: BBLabel) {
+    pub fn add_tac_label_to_bb_label_mapping(
+        &mut self,
+        tac_label: ThreeAddrCodeLabel,
+        bb_label: BBLabel,
+    ) {
         self.tac_label_to_bb_label.insert(tac_label, bb_label);
     }
 
@@ -276,12 +282,12 @@ mod test {
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
-    use crate::three_addr_code_ir::{LValueI, reset_label_counter};
+    use crate::three_addr_code_ir::{reset_label_counter, LValueI};
     use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, TempI};
     use linked_hash_map::LinkedHashMap;
+    use serial_test::serial;
     use std::collections::HashMap;
     use std::rc::Rc;
-    use serial_test::serial;
 
     lalrpop_mod!(pub microc);
 

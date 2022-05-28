@@ -1,6 +1,6 @@
 use crate::three_addr_code_ir::{
-    BinaryExprOperandI, BinaryExprOperandF, FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, ResultType,
-    TempF, TempI,
+    BinaryExprOperandF, BinaryExprOperandI, FunctionIdent, IdentF, IdentI, IdentS, LValueF,
+    LValueI, Label, ResultType, TempF, TempI,
 };
 
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
@@ -211,7 +211,10 @@ pub mod visit {
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         EqF, EqI, GtF, GtI, GteF, GteI, Jump, LtF, LtI, LteF, LteI, NeF, NeI,
     };
-    use crate::three_addr_code_ir::{reset_temp_counter, FunctionIdent, IdentF, IdentI, LValueF, LValueI, Label, ResultType, TempF, TempI, LValue};
+    use crate::three_addr_code_ir::{
+        reset_temp_counter, FunctionIdent, IdentF, IdentI, LValue, LValueF, LValueI, Label,
+        ResultType, TempF, TempI,
+    };
     use typed_builder::TypedBuilder;
 
     #[derive(Debug, Clone, TypedBuilder)]
@@ -226,11 +229,9 @@ pub mod visit {
     #[cfg(test)]
     impl CodeObject {
         pub fn result_type(&self) -> Option<ResultType> {
-            self.result.as_ref().map(|lvalue| {
-                match lvalue {
-                    LValue::LValueI(_) => ResultType::Int,
-                    LValue::LValueF(_) => ResultType::Float,
-                }
+            self.result.as_ref().map(|lvalue| match lvalue {
+                LValue::LValueI(_) => ResultType::Int,
+                LValue::LValueF(_) => ResultType::Float,
             })
         }
     }
@@ -420,9 +421,7 @@ pub mod visit {
                         ResultType::Float => IdentF(identifier.symbol).into(),
                     };
 
-                    CodeObject::builder()
-                        .result(result)
-                        .build()
+                    CodeObject::builder().result(result).build()
                 }
                 Expr::IntLiteral(n) => {
                     let temp_result = TempI::new();
@@ -481,8 +480,9 @@ pub mod visit {
                             }
                             (left, right) => panic!(
                                 "Unsupported operands for Add. Left: [{:?}], Right: [{:?}]",
-                                left.result_type(), right.result_type()
-                            )
+                                left.result_type(),
+                                right.result_type()
+                            ),
                         },
                         AddOp::Sub => match (curr_left_operand, curr_right_operand) {
                             (LValue::LValueI(left), LValue::LValueI(right)) => {
@@ -509,8 +509,9 @@ pub mod visit {
                             }
                             (left, right) => panic!(
                                 "Unsupported operands for Sub. Left: [{:?}], Right: [{:?}]",
-                                left.result_type(), right.result_type()
-                            )
+                                left.result_type(),
+                                right.result_type()
+                            ),
                         },
                     };
 
@@ -557,8 +558,9 @@ pub mod visit {
                             }
                             (left, right) => panic!(
                                 "Unsupported operands for Mul. Left: [{:?}], Right: [{:?}]",
-                                left.result_type(), right.result_type()
-                            )
+                                left.result_type(),
+                                right.result_type()
+                            ),
                         },
                         MulOp::Div => match (curr_left_operand, curr_right_operand) {
                             (LValue::LValueI(left), LValue::LValueI(right)) => {
@@ -585,8 +587,9 @@ pub mod visit {
                             }
                             (left, right) => panic!(
                                 "Unsupported operands for Div. Left: [{:?}], Right: [{:?}]",
-                                left.result_type(), right.result_type()
-                            )
+                                left.result_type(),
+                                right.result_type()
+                            ),
                         },
                     };
 
@@ -619,11 +622,9 @@ pub mod visit {
                             // a result with a strong type.
                             expr_code_obj.result.unwrap()
                         })
-                        .map(|arg| {
-                            match arg {
-                                LValue::LValueI(arg) => ThreeAddressCode::PushI(arg.into()),
-                                LValue::LValueF(arg) => ThreeAddressCode::PushF(arg.into()),
-                            }
+                        .map(|arg| match arg {
+                            LValue::LValueI(arg) => ThreeAddressCode::PushI(arg.into()),
+                            LValue::LValueF(arg) => ThreeAddressCode::PushF(arg.into()),
                         })
                         .collect();
 
@@ -707,8 +708,9 @@ pub mod visit {
                     },
                     (_, result) => panic!(
                         "Unsupported assignment. Cannot assign {:?} to {:?}",
-                        result.result_type(), num_type
-                    )
+                        result.result_type(),
+                        num_type
+                    ),
                 },
             };
 
@@ -728,104 +730,105 @@ pub mod visit {
 
             let else_label = Label::new();
 
-            let curr_code = match cmp_op {
-                CmpOp::Lt => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => GteI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => GteF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+            let curr_code =
+                match cmp_op {
+                    CmpOp::Lt => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => GteI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => GteF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-                CmpOp::Gt => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => LteI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
+                    ),
                     },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => LteF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+                    CmpOp::Gt => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => LteI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => LteF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-                CmpOp::Eq => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => NeI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
+                    ),
                     },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => NeF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+                    CmpOp::Eq => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => NeI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => NeF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-                CmpOp::Ne => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => EqI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
+                    ),
                     },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => EqF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+                    CmpOp::Ne => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => EqI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => EqF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-                CmpOp::Lte => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => GtI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
+                    ),
                     },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => GtF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+                    CmpOp::Lte => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => GtI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => GtF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-                CmpOp::Gte => match (curr_left_operand, curr_right_operand) {
-                    (LValue::LValueI(left), LValue::LValueI(right)) => LtI {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
+                    ),
                     },
-                    (LValue::LValueF(left), LValue::LValueF(right)) => LtF {
-                        lhs: left.into(),
-                        rhs: right.into(),
-                        label: else_label,
-                    },
-                    (left, right) => panic!(
+                    CmpOp::Gte => match (curr_left_operand, curr_right_operand) {
+                        (LValue::LValueI(left), LValue::LValueI(right)) => LtI {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (LValue::LValueF(left), LValue::LValueF(right)) => LtF {
+                            lhs: left.into(),
+                            rhs: right.into(),
+                            label: else_label,
+                        },
+                        (left, right) => panic!(
                         "Unsupported comparison operand combination. Left: [{:?}], Right: [{:?}]",
                         left.result_type(), right.result_type()
-                    )
-                },
-            };
+                    ),
+                    },
+                };
 
             left_code_seq.append(&mut right_code_seq);
             left_code_seq.push(curr_code);
@@ -945,10 +948,7 @@ mod test {
 
         dbg!(code_object.clone());
 
-        matches!(
-            code_object.result,
-            Some(LValue::LValueF(LValueF::Temp(_)))
-        );
+        matches!(code_object.result, Some(LValue::LValueF(LValueF::Temp(_))));
         assert_eq!(ResultType::Float, code_object.result_type().unwrap());
         assert_eq!(2, code_object.code_sequence.len());
     }

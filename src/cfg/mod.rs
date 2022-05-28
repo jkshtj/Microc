@@ -1,9 +1,9 @@
 use crate::cfg::basic_block::{BBFunction, BBLabel, ImmutableBasicBlock};
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+use crate::three_addr_code_ir::{LValueF, LValueI};
 use linked_hash_map::LinkedHashMap;
-use std::fmt::{Display, Formatter};
-use crate::three_addr_code_ir::{LValueI, LValueF};
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 
 pub mod basic_block;
 pub mod liveness;
@@ -51,14 +51,23 @@ impl ControlFlowGraph {
         self.bb_map.iter()
     }
 
-    pub fn into_parts(self) -> (LinkedHashMap<BBLabel, Vec<BBLabel>>, LinkedHashMap<BBLabel, ImmutableBasicBlock>) {
+    pub fn into_parts(
+        self,
+    ) -> (
+        LinkedHashMap<BBLabel, Vec<BBLabel>>,
+        LinkedHashMap<BBLabel, ImmutableBasicBlock>,
+    ) {
         (self.bb_map, self.bbs)
     }
 }
 
 impl From<BBFunction> for ControlFlowGraph {
     fn from(bb_function: BBFunction) -> Self {
-        fn create_edge(bb_map: &mut LinkedHashMap<BBLabel, Vec<BBLabel>>, from: BBLabel, to: BBLabel) {
+        fn create_edge(
+            bb_map: &mut LinkedHashMap<BBLabel, Vec<BBLabel>>,
+            from: BBLabel,
+            to: BBLabel,
+        ) {
             bb_map.entry(from).or_insert(vec![]).push(to);
         }
 
@@ -89,7 +98,11 @@ impl From<BBFunction> for ControlFlowGraph {
             // Create an edge to the explicit jump/branch target
             // of the current basic block.
             if let Some(tac_label) = last_tac.get_label_if_branch_or_jump() {
-                create_edge(&mut bb_map, *bb_label, tac_label_to_bb_label_map[&tac_label]);
+                create_edge(
+                    &mut bb_map,
+                    *bb_label,
+                    tac_label_to_bb_label_map[&tac_label],
+                );
             }
         }
 
@@ -100,6 +113,7 @@ impl From<BBFunction> for ControlFlowGraph {
 #[cfg(test)]
 mod test {
     use crate::cfg::basic_block::{BBFunction, BBLabel};
+    use crate::cfg::ControlFlowGraph;
     use crate::symbol_table::symbol::function::ReturnType;
     use crate::symbol_table::symbol::{data, function};
     use crate::three_addr_code_ir;
@@ -110,13 +124,12 @@ mod test {
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
-    use crate::three_addr_code_ir::{LValueI, reset_label_counter};
+    use crate::three_addr_code_ir::{reset_label_counter, LValueI};
     use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, TempI};
     use linked_hash_map::LinkedHashMap;
+    use serial_test::serial;
     use std::collections::HashMap;
     use std::rc::Rc;
-    use crate::cfg::ControlFlowGraph;
-    use serial_test::serial;
 
     lalrpop_mod!(pub microc);
 

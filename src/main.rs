@@ -17,6 +17,7 @@ use crate::three_addr_code_ir::three_address_code::{
     visit::ThreeAddressCodeVisitor, ThreeAddressCode,
 };
 
+use crate::cfg::liveness::LivenessDecoratedControlFlowGraph;
 use crate::cfg::ControlFlowGraph;
 use flexi_logger::Logger;
 use std::error::Error;
@@ -24,7 +25,6 @@ use std::fs::File;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
-use crate::cfg::liveness::LivenessDecoratedControlFlowGraph;
 
 lalrpop_mod!(pub microc);
 
