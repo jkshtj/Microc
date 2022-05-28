@@ -198,15 +198,11 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
                     gen_set.insert(LValue::LValueF(lvalue.clone()));
                 }
             }
-            ThreeAddressCode::PushI(op) => {
-                if let BinaryExprOperandI::LValue(lvalue) = op {
-                    gen_set.insert(LValue::LValueI(lvalue.clone()));
-                }
+            ThreeAddressCode::PushI(BinaryExprOperandI::LValue(lvalue)) => {
+                gen_set.insert(LValue::LValueI(lvalue.clone()));
             }
-            ThreeAddressCode::PushF(op) => {
-                if let BinaryExprOperandF::LValue(lvalue) = op {
-                    gen_set.insert(LValue::LValueF(lvalue.clone()));
-                }
+            ThreeAddressCode::PushF(BinaryExprOperandF::LValue(lvalue)) => {
+                gen_set.insert(LValue::LValueF(lvalue.clone()));
             }
             ThreeAddressCode::PopI(op) => {
                 kill_set.insert(LValue::LValueI(op.clone()));
@@ -324,7 +320,7 @@ impl From<ImmutableBasicBlock> for LivenessDecoratedImmutableBasicBlock {
             label,
             seq: seq
                 .into_iter()
-                .map(|tac| Into::<LivenessDecoratedThreeAddressCode>::into(tac))
+                .map(Into::<LivenessDecoratedThreeAddressCode>::into)
                 .collect(),
         }
     }
@@ -443,8 +439,8 @@ impl LivenessDecoratedControlFlowGraph {
                 let out_set_minus_kill_set = &out_set - &*tac.kill_set().borrow();
                 let in_set = &out_set_minus_kill_set | &*tac.gen_set().borrow();
 
-                let out_set_changed = &out_set != &*tac.out_set().borrow();
-                let in_set_changed = &in_set != &*tac.in_set().borrow();
+                let out_set_changed = out_set != *tac.out_set().borrow();
+                let in_set_changed = in_set != *tac.in_set().borrow();
 
                 if out_set_changed {
                     tac.out_set().borrow_mut().extend(out_set);

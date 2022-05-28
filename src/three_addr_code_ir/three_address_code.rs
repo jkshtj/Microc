@@ -192,10 +192,7 @@ impl ThreeAddressCode {
     }
 
     pub fn is_unconditional_branch(&self) -> bool {
-        match self {
-            ThreeAddressCode::Jump(_) => true,
-            _ => false,
-        }
+        matches!(self, ThreeAddressCode::Jump(_))
     }
 }
 
@@ -264,7 +261,7 @@ pub mod visit {
                     code_sequence.push(ThreeAddressCode::FunctionLabel(FunctionIdent(
                         symbol.clone(),
                     )));
-                    code_sequence.push(ThreeAddressCode::Link(FunctionIdent(symbol.clone())));
+                    code_sequence.push(ThreeAddressCode::Link(FunctionIdent(symbol)));
                     let mut func_body = body
                         .into_iter()
                         .flat_map(|stmt| self.visit_statement(stmt).code_sequence)
@@ -638,7 +635,7 @@ pub mod visit {
 
                     // Jump to target - current pc is pushed onto the stack as part of this instruction.
                     // The pc pushed onto the stack should be popped off in the callee code.
-                    code_sequence.push(ThreeAddressCode::Jsr(FunctionIdent(func_symbol.clone())));
+                    code_sequence.push(ThreeAddressCode::Jsr(FunctionIdent(func_symbol)));
 
                     // Pop all the function parameters
                     (0..num_args).for_each(|_| code_sequence.push(ThreeAddressCode::PopEmpty));

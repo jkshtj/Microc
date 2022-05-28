@@ -86,7 +86,7 @@ pub struct IdentI(pub data::Symbol);
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
-        IdentI(id.symbol.clone())
+        IdentI(id.symbol)
     }
 }
 
@@ -96,7 +96,7 @@ pub struct IdentF(pub data::Symbol);
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
-        IdentF(id.symbol.clone())
+        IdentF(id.symbol)
     }
 }
 
@@ -106,7 +106,7 @@ pub struct IdentS(pub data::Symbol);
 
 impl From<Identifier> for IdentS {
     fn from(id: Identifier) -> Self {
-        IdentS(id.symbol.clone())
+        IdentS(id.symbol)
     }
 }
 
@@ -180,10 +180,7 @@ pub enum BinaryExprOperandI {
 
 impl BinaryExprOperandI {
     pub fn is_mem_ref(&self) -> bool {
-        match self {
-            BinaryExprOperandI::LValue(LValueI::Id(_)) => true,
-            _ => false,
-        }
+        matches!(self, BinaryExprOperandI::LValue(LValueI::Id(_)))
     }
 }
 
@@ -220,10 +217,7 @@ pub enum BinaryExprOperandF {
 
 impl BinaryExprOperandF {
     pub fn is_mem_ref(&self) -> bool {
-        match self {
-            BinaryExprOperandF::LValue(LValueF::Id(_)) => true,
-            _ => false,
-        }
+        matches!(self, BinaryExprOperandF::LValue(LValueF::Id(_)))
     }
 }
 

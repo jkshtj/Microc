@@ -72,7 +72,8 @@ impl BasicBlock {
 /// terminator. All branch/jump and return 3ACs can
 /// be basic block terminators.
 pub fn is_bb_terminator(tac: &ThreeAddressCode) -> bool {
-    match tac {
+    matches!(
+        tac,
         // Unconditional jump
         ThreeAddressCode::Jump(_)
         // Conditional jump
@@ -87,9 +88,8 @@ pub fn is_bb_terminator(tac: &ThreeAddressCode) -> bool {
         | ThreeAddressCode::GteF { .. }
         | ThreeAddressCode::LteF { .. }
         | ThreeAddressCode::NeF { .. }
-        | ThreeAddressCode::EqF { .. } => true,
-        _ => false,
-    }
+        | ThreeAddressCode::EqF { .. }
+    )
 }
 
 /// Same struct as the internal `BasicBlock` struct
@@ -202,7 +202,7 @@ impl BBFunction {
     }
 
     pub fn add_block(&mut self, bb: ImmutableBasicBlock) {
-        self.bbs.insert(bb.label(), bb.into());
+        self.bbs.insert(bb.label(), bb);
     }
 
     pub fn add_tac_label_to_bb_label_mapping(

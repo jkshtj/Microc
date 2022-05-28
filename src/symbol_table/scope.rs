@@ -213,7 +213,7 @@ impl Scope {
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map(|symbol| data::Symbol::NonFunctionScopedSymbol(symbol.clone()))
-                .ok_or(SymbolError::UseUndeclaredSymbol(
+                .ok_or_else(|| SymbolError::UseUndeclaredSymbol(
                     UseUndeclaredSymbolError::new(symbol_name.to_owned()),
                 )),
             Scope::Anonymous {
@@ -251,8 +251,8 @@ impl Scope {
             } => function_symbols
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
-                .map(|symbol| symbol.clone())
-                .ok_or(SymbolError::UseUndeclaredSymbol(
+                .cloned()
+                .ok_or_else(|| SymbolError::UseUndeclaredSymbol(
                     UseUndeclaredSymbolError::new(symbol_name.to_owned()),
                 )),
             Scope::Anonymous { .. } | Scope::Function { .. } => {

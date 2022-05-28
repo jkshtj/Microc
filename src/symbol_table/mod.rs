@@ -134,10 +134,10 @@ impl SymbolTable {
     pub fn data_symbol_for_name(symbol_name: &str) -> Result<data::Symbol, SymbolError> {
         SYMBOL_TABLE.with(|symbol_table| {
             let scope_tree = &symbol_table.borrow().scope_tree;
-            Ok(scope_tree
+            scope_tree
                 .active_scope()
                 .borrow()
-                .data_symbol_for_name(symbol_name)?)
+                .data_symbol_for_name(symbol_name)
         })
     }
 
@@ -150,10 +150,10 @@ impl SymbolTable {
             // Functions are only declared in global scope and
             // therefore it makes sense to only look for them
             // in the global scope.
-            Ok(scope_tree
+            scope_tree
                 .global_scope()
                 .borrow()
-                .function_symbol_for_name(symbol_name)?)
+                .function_symbol_for_name(symbol_name)
         })
     }
 

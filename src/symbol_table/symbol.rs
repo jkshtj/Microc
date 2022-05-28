@@ -132,7 +132,7 @@ pub mod function {
             Self {
                 name,
                 return_type,
-                params: params,
+                params,
                 locals,
             }
         }
