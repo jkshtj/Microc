@@ -213,9 +213,11 @@ impl Scope {
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .map(|symbol| data::Symbol::NonFunctionScopedSymbol(symbol.clone()))
-                .ok_or_else(|| SymbolError::UseUndeclaredSymbol(
-                    UseUndeclaredSymbolError::new(symbol_name.to_owned()),
-                )),
+                .ok_or_else(|| {
+                    SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
+                        symbol_name.to_owned(),
+                    ))
+                }),
             Scope::Anonymous {
                 data_symbols,
                 parent,
@@ -252,9 +254,11 @@ impl Scope {
                 .iter()
                 .find(|&symbol| symbol.name() == symbol_name)
                 .cloned()
-                .ok_or_else(|| SymbolError::UseUndeclaredSymbol(
-                    UseUndeclaredSymbolError::new(symbol_name.to_owned()),
-                )),
+                .ok_or_else(|| {
+                    SymbolError::UseUndeclaredSymbol(UseUndeclaredSymbolError::new(
+                        symbol_name.to_owned(),
+                    ))
+                }),
             Scope::Anonymous { .. } | Scope::Function { .. } => {
                 unreachable!("A function symbol should never be looked up in a non-GLOBAL scope!")
             }

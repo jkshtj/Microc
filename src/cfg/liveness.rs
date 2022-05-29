@@ -9,11 +9,11 @@ use crate::three_addr_code_ir::{
 };
 use linked_hash_map::LinkedHashMap;
 use std::cell::RefCell;
+use std::cmp::max;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
-use std::cmp::max;
 
 /// Represent the GEN, KILL, IN and OUT
 /// sets associated to a 3AC node.
@@ -265,11 +265,33 @@ impl Display for LivenessDecoratedThreeAddressCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // With enough global variables, max_space might lead to an
         // overflow while calculating the different `space_*` values.
-        let max_space = SymbolTable::global_symbols().iter().map(|x| x.name().len()).max().map_or(30, |x| max(x*10, 30));
+        let max_space = SymbolTable::global_symbols()
+            .iter()
+            .map(|x| x.name().len())
+            .max()
+            .map_or(30, |x| max(x * 10, 30));
         let space_gen = max_space - self.tac().to_string().len();
-        let space_kill = max_space - self.gen_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
-        let space_in = max_space - self.kill_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
-        let space_out = max_space - self.in_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
+        let space_kill = max_space
+            - self
+                .gen_set()
+                .borrow()
+                .iter()
+                .map(|x| x.to_string().len() + 2)
+                .sum::<usize>() as usize;
+        let space_in = max_space
+            - self
+                .kill_set()
+                .borrow()
+                .iter()
+                .map(|x| x.to_string().len() + 2)
+                .sum::<usize>() as usize;
+        let space_out = max_space
+            - self
+                .in_set()
+                .borrow()
+                .iter()
+                .map(|x| x.to_string().len() + 2)
+                .sum::<usize>() as usize;
 
         write!(f, "{}", self.tac())?;
         write!(f, "{:>space_gen$}", "| GEN: ")?;
@@ -347,7 +369,9 @@ impl Display for LivenessDecoratedImmutableBasicBlock {
 }
 
 #[cfg(test)]
-impl From<(BBLabel, Vec<LivenessDecoratedThreeAddressCode>)> for LivenessDecoratedImmutableBasicBlock {
+impl From<(BBLabel, Vec<LivenessDecoratedThreeAddressCode>)>
+    for LivenessDecoratedImmutableBasicBlock
+{
     fn from(data: (BBLabel, Vec<LivenessDecoratedThreeAddressCode>)) -> Self {
         Self {
             label: data.0,
@@ -369,11 +393,11 @@ pub struct LivenessDecoratedControlFlowGraph {
 
 impl LivenessDecoratedControlFlowGraph {
     #[cfg(test)]
-    pub fn new(bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>, bbs: LinkedHashMap<BBLabel, LivenessDecoratedImmutableBasicBlock>) -> Self {
-        Self {
-            bb_map,
-            bbs,
-        }
+    pub fn new(
+        bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>,
+        bbs: LinkedHashMap<BBLabel, LivenessDecoratedImmutableBasicBlock>,
+    ) -> Self {
+        Self { bb_map, bbs }
     }
 
     pub fn basic_blocks(
@@ -531,21 +555,28 @@ impl Display for LivenessDecoratedControlFlowGraph {
 
 #[cfg(test)]
 mod test {
-    use crate::cfg::basic_block::{BBLabel, ImmutableBasicBlock, BBFunction};
-    use crate::cfg::liveness::{LValue, LivenessDecoratedImmutableBasicBlock, LivenessDecoratedThreeAddressCode, LivenessMetadata, LivenessDecoratedControlFlowGraph};
+    use crate::cfg::basic_block::{BBFunction, BBLabel, ImmutableBasicBlock};
+    use crate::cfg::liveness::{
+        LValue, LivenessDecoratedControlFlowGraph, LivenessDecoratedImmutableBasicBlock,
+        LivenessDecoratedThreeAddressCode, LivenessMetadata,
+    };
+    use crate::cfg::ControlFlowGraph;
     use crate::symbol_table::symbol::function::ReturnType;
     use crate::symbol_table::symbol::{data, function};
     use crate::symbol_table::{symbol_table_test_setup, SymbolTable};
+    use crate::three_addr_code_ir;
+    use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, LValueI, TempI, reset_label_counter};
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
+        FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
+    };
+    use crate::three_addr_code_ir::{
+        reset_label_counter, BinaryExprOperandI, FunctionIdent, IdentI, LValueI, TempI,
+    };
+    use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
     use std::collections::HashSet;
     use std::rc::Rc;
-    use crate::three_addr_code_ir;
-    use linked_hash_map::LinkedHashMap;
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{StoreI, MulI, LteI, Jump, WriteI, FunctionLabel, Link, Label};
-    use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
-    use crate::cfg::ControlFlowGraph;
 
     lalrpop_mod!(pub microc);
 
@@ -1349,7 +1380,9 @@ mod test {
                     },
                     // WRITEI i
                     LivenessDecoratedThreeAddressCode {
-                        tac: WriteI { identifier: i.clone() },
+                        tac: WriteI {
+                            identifier: i.clone(),
+                        },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({
                                 let mut gen = HashSet::new();
