@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
+use std::cmp::max;
 
 /// Represent the GEN, KILL, IN and OUT
 /// sets associated to a 3AC node.
@@ -262,23 +263,31 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
 
 impl Display for LivenessDecoratedThreeAddressCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // With enough global variables, max_space might lead to an
+        // overflow while calculating the different `space_*` values.
+        let max_space = SymbolTable::global_symbols().iter().map(|x| x.name().len()).max().map_or(30, |x| max(x*10, 30));
+        let space_gen = max_space - self.tac().to_string().len();
+        let space_kill = max_space - self.gen_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
+        let space_in = max_space - self.kill_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
+        let space_out = max_space - self.in_set().borrow().iter().map(|x| x.to_string().len() + 2).sum::<usize>() as usize;
+
         write!(f, "{}", self.tac())?;
-        write!(f, "     | GEN: ")?;
+        write!(f, "{:>space_gen$}", "| GEN: ")?;
         self.gen_set()
             .borrow()
             .iter()
             .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "     | KILL: ")?;
+        write!(f, "{:>space_kill$}", "| KILL: ")?;
         self.kill_set()
             .borrow()
             .iter()
             .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "     | IN: ")?;
+        write!(f, "{:>space_in$}", "| IN: ")?;
         self.in_set()
             .borrow()
             .iter()
             .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "     | OUT: ")?;
+        write!(f, "{:>space_out$}", "| OUT: ")?;
         self.out_set()
             .borrow()
             .iter()
@@ -337,6 +346,16 @@ impl Display for LivenessDecoratedImmutableBasicBlock {
     }
 }
 
+#[cfg(test)]
+impl From<(BBLabel, Vec<LivenessDecoratedThreeAddressCode>)> for LivenessDecoratedImmutableBasicBlock {
+    fn from(data: (BBLabel, Vec<LivenessDecoratedThreeAddressCode>)) -> Self {
+        Self {
+            label: data.0,
+            seq: data.1,
+        }
+    }
+}
+
 /// Control flow graph containing `LivenessDecoratedImmutableBasicBlock`s.
 #[derive(Debug, PartialEq)]
 pub struct LivenessDecoratedControlFlowGraph {
@@ -349,6 +368,14 @@ pub struct LivenessDecoratedControlFlowGraph {
 }
 
 impl LivenessDecoratedControlFlowGraph {
+    #[cfg(test)]
+    pub fn new(bb_map: LinkedHashMap<BBLabel, Vec<BBLabel>>, bbs: LinkedHashMap<BBLabel, LivenessDecoratedImmutableBasicBlock>) -> Self {
+        Self {
+            bb_map,
+            bbs,
+        }
+    }
+
     pub fn basic_blocks(
         &self,
     ) -> impl Iterator<Item = (&BBLabel, &LivenessDecoratedImmutableBasicBlock)> {
@@ -359,14 +386,14 @@ impl LivenessDecoratedControlFlowGraph {
         self.bb_map.iter()
     }
 
-    pub fn basic_block_for_label(
+    fn basic_block_for_label(
         &self,
         bb_label: &BBLabel,
     ) -> Option<&LivenessDecoratedImmutableBasicBlock> {
         self.bbs.get(bb_label)
     }
 
-    pub fn neighbors_of_bb(&self, bb_label: &BBLabel) -> Option<&[BBLabel]> {
+    fn neighbors_of_bb(&self, bb_label: &BBLabel) -> Option<&[BBLabel]> {
         self.bb_map
             .get(bb_label)
             .map(|neighbors| neighbors.as_slice())
@@ -374,7 +401,7 @@ impl LivenessDecoratedControlFlowGraph {
 
     /// Updates the in and out sets associated to each 3AC node
     /// present in the CFG's basic blocks.
-    pub fn update_in_and_out_sets(&mut self) {
+    fn finalize_in_and_out_sets(&mut self) {
         /*
         1. Put all of the IR nodes on the worklist
         2. Pull an IR node off the worklist, and compute its OUT and IN sets.
@@ -468,7 +495,7 @@ impl LivenessDecoratedControlFlowGraph {
 impl From<ControlFlowGraph> for LivenessDecoratedControlFlowGraph {
     fn from(cfg: ControlFlowGraph) -> Self {
         let (bb_map, bbs) = cfg.into_parts();
-        Self {
+        let mut cfg = Self {
             bb_map,
             bbs: bbs
                 .into_iter()
@@ -479,7 +506,10 @@ impl From<ControlFlowGraph> for LivenessDecoratedControlFlowGraph {
                     )
                 })
                 .collect(),
-        }
+        };
+
+        cfg.finalize_in_and_out_sets();
+        cfg
     }
 }
 
@@ -501,19 +531,23 @@ impl Display for LivenessDecoratedControlFlowGraph {
 
 #[cfg(test)]
 mod test {
-    use crate::cfg::basic_block::{BBLabel, ImmutableBasicBlock};
-    use crate::cfg::liveness::{
-        LValue, LivenessDecoratedImmutableBasicBlock, LivenessDecoratedThreeAddressCode,
-        LivenessMetadata,
-    };
+    use crate::cfg::basic_block::{BBLabel, ImmutableBasicBlock, BBFunction};
+    use crate::cfg::liveness::{LValue, LivenessDecoratedImmutableBasicBlock, LivenessDecoratedThreeAddressCode, LivenessMetadata, LivenessDecoratedControlFlowGraph};
     use crate::symbol_table::symbol::function::ReturnType;
     use crate::symbol_table::symbol::{data, function};
     use crate::symbol_table::{symbol_table_test_setup, SymbolTable};
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, LValueI, TempI};
+    use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, LValueI, TempI, reset_label_counter};
     use serial_test::serial;
     use std::collections::HashSet;
     use std::rc::Rc;
+    use crate::three_addr_code_ir;
+    use linked_hash_map::LinkedHashMap;
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{StoreI, MulI, LteI, Jump, WriteI, FunctionLabel, Link, Label};
+    use crate::three_addr_code_ir::three_address_code::visit::ThreeAddressCodeVisitor;
+    use crate::cfg::ControlFlowGraph;
+
+    lalrpop_mod!(pub microc);
 
     #[test]
     fn push_instruction_gens_var_being_pushed() {
@@ -841,5 +875,562 @@ mod test {
         let actual_liveness_decorated_bb: LivenessDecoratedImmutableBasicBlock =
             immutable_bb.into();
         assert_eq!(expected_liveness_decorated_bb, actual_liveness_decorated_bb);
+    }
+
+    #[test]
+    #[serial]
+    fn bb_function_to_liveness_decorated_cfg() {
+        reset_label_counter();
+
+        let program = r"
+            PROGRAM sample
+            BEGIN
+
+                INT a, b, i, p;
+
+                FUNCTION VOID main()
+                BEGIN
+
+                    a := 4;
+                    b := 2;
+                    p := a*b;
+
+                    IF (p > 10)
+                        i := 42;
+                    ELSE
+                        i := 24;
+                    FI
+
+                    WRITE (i);
+                END
+            END
+        ";
+
+        let a = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "a".to_owned(),
+            },
+        )));
+        let b = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "b".to_owned(),
+            },
+        )));
+        let p = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "p".to_owned(),
+            },
+        )));
+        let i = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "i".to_owned(),
+            },
+        )));
+
+        let main = FunctionIdent(Rc::new(function::Symbol::new(
+            "main".to_owned(),
+            ReturnType::Void,
+            vec![],
+            vec![],
+        )));
+        let (t1, t2, t3, t4, t5, t6): (TempI, TempI, TempI, TempI, TempI, TempI) =
+            (1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into());
+        let (tac_label1, tac_label2): (three_addr_code_ir::Label, three_addr_code_ir::Label) =
+            (1.into(), 2.into());
+        let (bb_label0, bb_label1, bb_label2, bb_label3): (BBLabel, BBLabel, BBLabel, BBLabel) =
+            (0.into(), 1.into(), 2.into(), 3.into());
+
+        let mut bbs = LinkedHashMap::new();
+        bbs.insert(
+            bb_label0,
+            (
+                bb_label0,
+                vec![
+                    // LABEL main
+                    LivenessDecoratedThreeAddressCode {
+                        tac: FunctionLabel(main.clone()),
+                        liveness_metadata: LivenessMetadata::builder().build(),
+                    },
+                    // LINK
+                    LivenessDecoratedThreeAddressCode {
+                        tac: Link(main),
+                        liveness_metadata: LivenessMetadata::builder().build(),
+                    },
+                    // STOREI 4, $t1
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Temp(t1),
+                            rhs: BinaryExprOperandI::RValue(4),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t1)));
+                                kill
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Temp(t1)));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI $t1 a
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Id(a.clone()),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Temp(t1)));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t1)));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI 2 $T2
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Temp(t2),
+                            rhs: BinaryExprOperandI::RValue(2),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t2)));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                out.insert(LValue::LValueI(LValueI::Temp(t2)));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI $T2 b
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Id(b.clone()),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Temp(t2)));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Id(b.clone())));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t2)));
+                                in_set.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(b.clone())));
+                                out.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // MULTI a b $T3
+                    LivenessDecoratedThreeAddressCode {
+                        tac: MulI {
+                            lhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
+                            temp_result: t3,
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Id(b.clone())));
+                                gen.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t3)));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(a.clone())));
+                                in_set.insert(LValue::LValueI(LValueI::Id(b.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Temp(t3)));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI $T3 p
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Id(p.clone()),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t3)),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Temp(t3)));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t3)));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI 10 $T4
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Temp(t4),
+                            rhs: BinaryExprOperandI::RValue(10),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t4)));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Temp(t4)));
+                                out.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // LE p $T4 label1
+                    LivenessDecoratedThreeAddressCode {
+                        tac: LteI {
+                            lhs: BinaryExprOperandI::LValue(LValueI::Id(p.clone())),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t4)),
+                            label: tac_label1,
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                gen.insert(LValue::LValueI(LValueI::Temp(t4)));
+                                gen
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(p.clone())));
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t4)));
+                                in_set
+                            })
+                            .build(),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label1,
+            (
+                bb_label1,
+                vec![
+                    // STOREI 42 $T5
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Temp(t5),
+                            rhs: BinaryExprOperandI::RValue(42),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t5)));
+                                kill
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Temp(t5)));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI $T5 i
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Id(i.clone()),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t5)),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Temp(t5)));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t5)));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // JUMP label2
+                    LivenessDecoratedThreeAddressCode {
+                        tac: Jump(tac_label2),
+                        liveness_metadata: LivenessMetadata::builder()
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label2,
+            (
+                bb_label2,
+                vec![
+                    // LABEL label1
+                    LivenessDecoratedThreeAddressCode {
+                        tac: Label(tac_label1),
+                        liveness_metadata: LivenessMetadata::builder().build(),
+                    },
+                    // STOREI 24 $T6
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Temp(t6),
+                            rhs: BinaryExprOperandI::RValue(24),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Temp(t6)));
+                                kill
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Temp(t6)));
+                                out
+                            })
+                            .build(),
+                    },
+                    // STOREI $T6 i
+                    LivenessDecoratedThreeAddressCode {
+                        tac: StoreI {
+                            lhs: LValueI::Id(i.clone()),
+                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t6)),
+                        },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Temp(t6)));
+                                gen
+                            })
+                            .kill_set({
+                                let mut kill = HashSet::new();
+                                kill.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                kill
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Temp(t6)));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // JUMP label2
+                    LivenessDecoratedThreeAddressCode {
+                        tac: Jump(tac_label2),
+                        liveness_metadata: LivenessMetadata::builder()
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label3,
+            (
+                bb_label3,
+                vec![
+                    // LABEL label2
+                    LivenessDecoratedThreeAddressCode {
+                        tac: Label(tac_label2),
+                        liveness_metadata: LivenessMetadata::builder()
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                in_set
+                            })
+                            .out_set({
+                                let mut out = HashSet::new();
+                                out.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                out
+                            })
+                            .build(),
+                    },
+                    // WRITEI i
+                    LivenessDecoratedThreeAddressCode {
+                        tac: WriteI { identifier: i.clone() },
+                        liveness_metadata: LivenessMetadata::builder()
+                            .gen_set({
+                                let mut gen = HashSet::new();
+                                gen.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                gen
+                            })
+                            .in_set({
+                                let mut in_set = HashSet::new();
+                                in_set.insert(LValue::LValueI(LValueI::Id(i.clone())));
+                                in_set
+                            })
+                            .build(),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        let mut bb_map = LinkedHashMap::new();
+        bb_map.insert(bb_label0, vec![bb_label2, bb_label1]);
+        bb_map.insert(bb_label1, vec![bb_label3]);
+        bb_map.insert(bb_label2, vec![bb_label3]);
+
+        let expected_cfg = LivenessDecoratedControlFlowGraph::new(bb_map, bbs);
+
+        // Parse program, generate 3AC, convert it into a `BBFunction`, convert `BBFunction`
+        // to a `ControlFlowGraph` and convert the `ControlFlowGraph` to a
+        // `LivenessDecoratedControlFlowGraph`.
+        let program = microc::ProgramParser::new().parse(&program);
+        let mut result = program.unwrap();
+        let mut visitor = ThreeAddressCodeVisitor;
+        result.reverse();
+        let cfg = result
+            .into_iter()
+            .map(|ast_node| visitor.walk_ast(ast_node))
+            .map(|code_object| Into::<BBFunction>::into(code_object))
+            .map(|bb_func| Into::<ControlFlowGraph>::into(bb_func))
+            .map(|cfg| Into::<LivenessDecoratedControlFlowGraph>::into(cfg))
+            .last()
+            .unwrap();
+
+        /*
+            Expected liveness decorated control flow graph -
+            ```
+            ==== Basic Blocks ===
+            BB0:
+            LABEL main              | GEN:            | KILL:           | IN:           | OUT:
+            LINK                    | GEN:            | KILL:           | IN:           | OUT:
+            STOREI 4 $T1            | GEN:            | KILL: $T1,      | IN:           | OUT: $T1,
+            STOREI $T1 a            | GEN: $T1,       | KILL: a,        | IN: $T1,      | OUT: a,
+            STOREI 2 $T2            | GEN:            | KILL: $T2,      | IN: a,        | OUT: a, $T2,
+            STOREI $T2 b            | GEN: $T2,       | KILL: b,        | IN: $T2, a,   | OUT: b, a,
+            MULTI a b $T3           | GEN: b, a,      | KILL: $T3,      | IN: a, b,     | OUT: $T3,
+            STOREI $T3 p            | GEN: $T3,       | KILL: p,        | IN: $T3,      | OUT: p,
+            STOREI 10 $T4           | GEN:            | KILL: $T4,      | IN: p,        | OUT: $T4, p,
+            LE p $T4 label1         | GEN: p, $T4,    | KILL:           | IN: p, $T4,   | OUT:
+
+            BB1:
+            STOREI 42 $T5           | GEN:            | KILL: $T5,      | IN:           | OUT: $T5,
+            STOREI $T5 i            | GEN: $T5,       | KILL: i,        | IN: $T5,      | OUT: i,
+            JUMP label2             | GEN:            | KILL:           | IN: i,        | OUT: i,
+
+            BB2:
+            LABEL label1            | GEN:            | KILL:           | IN:           | OUT:
+            STOREI 24 $T6           | GEN:            | KILL: $T6,      | IN:           | OUT: $T6,
+            STOREI $T6 i            | GEN: $T6,       | KILL: i,        | IN: $T6,      | OUT: i,
+            JUMP label2             | GEN:            | KILL:           | IN: i,        | OUT: i,
+
+            BB3:
+            LABEL label2            | GEN:            | KILL:           | IN: i,        | OUT: i,
+            WRITEI i                | GEN: i,         | KILL:           | IN: i,        | OUT:
+
+            ==== CFG ===
+            BB0: [BBLabel(2), BBLabel(1)]
+            BB1: [BBLabel(3)]
+            BB2: [BBLabel(3)]
+            ```
+        */
+        println!("{expected_cfg}");
+        // println!("{cfg}");
+
+        assert_eq!(expected_cfg, cfg);
     }
 }
