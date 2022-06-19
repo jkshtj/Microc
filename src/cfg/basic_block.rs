@@ -283,7 +283,7 @@ mod test {
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
     use crate::three_addr_code_ir::{reset_label_counter, LValueI};
-    use crate::three_addr_code_ir::{BinaryExprOperandI, FunctionIdent, IdentI, TempI};
+    use crate::three_addr_code_ir::{RValueI, FunctionIdent, IdentI, TempI};
     use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
     use std::collections::HashMap;
@@ -371,43 +371,43 @@ mod test {
                     // STOREI 4, $t1
                     StoreI {
                         lhs: LValueI::Temp(t1),
-                        rhs: BinaryExprOperandI::RValue(4),
+                        rhs: RValueI::RValue(4),
                     },
                     // STOREI $t1 a
                     StoreI {
                         lhs: LValueI::Id(a.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
+                        rhs: RValueI::LValue(LValueI::Temp(t1)),
                     },
                     // STOREI 2 $T2
                     StoreI {
                         lhs: LValueI::Temp(t2),
-                        rhs: BinaryExprOperandI::RValue(2),
+                        rhs: RValueI::RValue(2),
                     },
                     // STOREI $T2 b
                     StoreI {
                         lhs: LValueI::Id(b.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
+                        rhs: RValueI::LValue(LValueI::Temp(t2)),
                     },
                     // MULTI a b $T3
                     MulI {
-                        lhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
+                        lhs: LValueI::Id(a.clone()),
+                        rhs: LValueI::Id(b.clone()),
                         temp_result: t3,
                     },
                     // STOREI $T3 p
                     StoreI {
                         lhs: LValueI::Id(p.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t3)),
+                        rhs: RValueI::LValue(LValueI::Temp(t3)),
                     },
                     // STOREI 10 $T4
                     StoreI {
                         lhs: LValueI::Temp(t4),
-                        rhs: BinaryExprOperandI::RValue(10),
+                        rhs: RValueI::RValue(10),
                     },
                     // LE p $T4 label1
                     LteI {
-                        lhs: BinaryExprOperandI::LValue(LValueI::Id(p.clone())),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t4)),
+                        lhs: LValueI::Id(p.clone()),
+                        rhs: LValueI::Temp(t4),
                         label: tac_label1,
                     },
                 ],
@@ -423,12 +423,12 @@ mod test {
                     // STOREI 42 $T5
                     StoreI {
                         lhs: LValueI::Temp(t5),
-                        rhs: BinaryExprOperandI::RValue(42),
+                        rhs: RValueI::RValue(42),
                     },
                     // STOREI $T5 i
                     StoreI {
                         lhs: LValueI::Id(i.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t5)),
+                        rhs: RValueI::LValue(LValueI::Temp(t5)),
                     },
                     // JUMP label2
                     Jump(tac_label2),
@@ -447,12 +447,12 @@ mod test {
                     // STOREI 24 $T6
                     StoreI {
                         lhs: LValueI::Temp(t6),
-                        rhs: BinaryExprOperandI::RValue(24),
+                        rhs: RValueI::RValue(24),
                     },
                     // STOREI $T6 i
                     StoreI {
                         lhs: LValueI::Id(i.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t6)),
+                        rhs: RValueI::LValue(LValueI::Temp(t6)),
                     },
                     // JUMP label2
                     Jump(tac_label2),

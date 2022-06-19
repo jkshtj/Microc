@@ -5,7 +5,7 @@ use crate::symbol_table::symbol::{data, NumType};
 use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::{
-    BinaryExprOperandF, BinaryExprOperandI, IdentF, IdentI, LValue, LValueF, LValueI,
+    RValueF, RValueI, IdentF, IdentI, LValue, LValueF, LValueI,
 };
 use linked_hash_map::LinkedHashMap;
 use std::cell::RefCell;
@@ -19,7 +19,7 @@ use typed_builder::TypedBuilder;
 /// sets associated to a 3AC node.
 #[derive(Debug, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(transform = |x: HashSet<LValue>| Rc::new(RefCell::new(x)))))]
-struct LivenessMetadata {
+pub struct LivenessMetadata {
     gen_set: Rc<RefCell<HashSet<LValue>>>,
     kill_set: Rc<RefCell<HashSet<LValue>>>,
     in_set: Rc<RefCell<HashSet<LValue>>>,
@@ -76,6 +76,10 @@ impl LivenessDecoratedThreeAddressCode {
     pub fn tac(&self) -> &ThreeAddressCode {
         &self.tac
     }
+
+    pub fn into_parts(self) -> (ThreeAddressCode, LivenessMetadata) {
+        (self.tac, self.liveness_metadata)
+    }
 }
 
 impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
@@ -105,18 +109,13 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
                 rhs,
                 temp_result,
             } => {
-                if let BinaryExprOperandI::LValue(lvalue) = lhs {
-                    gen_set.insert(LValue::LValueI(lvalue.clone()));
-                }
-
-                if let BinaryExprOperandI::LValue(lvalue) = rhs {
-                    gen_set.insert(LValue::LValueI(lvalue.clone()));
-                }
+                gen_set.insert(LValue::LValueI(lhs.clone()));
+                gen_set.insert(LValue::LValueI(rhs.clone()));
 
                 kill_set.insert((*temp_result).into());
             }
             ThreeAddressCode::StoreI { lhs, rhs } => {
-                if let BinaryExprOperandI::LValue(lvalue) = rhs {
+                if let RValueI::LValue(lvalue) = rhs {
                     gen_set.insert(LValue::LValueI(lvalue.clone()));
                 }
 
@@ -148,18 +147,13 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
                 rhs,
                 temp_result,
             } => {
-                if let BinaryExprOperandF::LValue(lvalue) = lhs {
-                    gen_set.insert(LValue::LValueF(lvalue.clone()));
-                }
-
-                if let BinaryExprOperandF::LValue(lvalue) = rhs {
-                    gen_set.insert(LValue::LValueF(lvalue.clone()));
-                }
+                gen_set.insert(LValue::LValueF(lhs.clone()));
+                gen_set.insert(LValue::LValueF(rhs.clone()));
 
                 kill_set.insert((*temp_result).into());
             }
             ThreeAddressCode::StoreF { lhs, rhs } => {
-                if let BinaryExprOperandF::LValue(lvalue) = rhs {
+                if let RValueF::LValue(lvalue) = rhs {
                     gen_set.insert(LValue::LValueF(lvalue.clone()));
                 }
 
@@ -177,13 +171,8 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
             | ThreeAddressCode::LteI { lhs, rhs, .. }
             | ThreeAddressCode::NeI { lhs, rhs, .. }
             | ThreeAddressCode::EqI { lhs, rhs, .. } => {
-                if let BinaryExprOperandI::LValue(lvalue) = lhs {
-                    gen_set.insert(LValue::LValueI(lvalue.clone()));
-                }
-
-                if let BinaryExprOperandI::LValue(lvalue) = rhs {
-                    gen_set.insert(LValue::LValueI(lvalue.clone()));
-                }
+                gen_set.insert(LValue::LValueI(lhs.clone()));
+                gen_set.insert(LValue::LValueI(rhs.clone()));
             }
             ThreeAddressCode::GtF { lhs, rhs, .. }
             | ThreeAddressCode::LtF { lhs, rhs, .. }
@@ -191,18 +180,13 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
             | ThreeAddressCode::LteF { lhs, rhs, .. }
             | ThreeAddressCode::NeF { lhs, rhs, .. }
             | ThreeAddressCode::EqF { lhs, rhs, .. } => {
-                if let BinaryExprOperandF::LValue(lvalue) = lhs {
-                    gen_set.insert(LValue::LValueF(lvalue.clone()));
-                }
-
-                if let BinaryExprOperandF::LValue(lvalue) = rhs {
-                    gen_set.insert(LValue::LValueF(lvalue.clone()));
-                }
+                gen_set.insert(LValue::LValueF(lhs.clone()));
+                gen_set.insert(LValue::LValueF(rhs.clone()));
             }
-            ThreeAddressCode::PushI(BinaryExprOperandI::LValue(lvalue)) => {
+            ThreeAddressCode::PushI(lvalue) => {
                 gen_set.insert(LValue::LValueI(lvalue.clone()));
             }
-            ThreeAddressCode::PushF(BinaryExprOperandF::LValue(lvalue)) => {
+            ThreeAddressCode::PushF(lvalue) => {
                 gen_set.insert(LValue::LValueF(lvalue.clone()));
             }
             ThreeAddressCode::PopI(op) => {
@@ -342,6 +326,10 @@ impl LivenessDecoratedImmutableBasicBlock {
     pub fn in_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
         self.first().in_set()
     }
+
+    pub fn into_parts(self) -> (BBLabel, Vec<LivenessDecoratedThreeAddressCode>) {
+        (self.label, self.seq)
+    }
 }
 
 impl From<ImmutableBasicBlock> for LivenessDecoratedImmutableBasicBlock {
@@ -404,6 +392,10 @@ impl LivenessDecoratedControlFlowGraph {
         &self,
     ) -> impl Iterator<Item = (&BBLabel, &LivenessDecoratedImmutableBasicBlock)> {
         self.bbs.iter()
+    }
+
+    pub fn into_basic_blocks(self) -> impl Iterator<Item = (BBLabel, LivenessDecoratedImmutableBasicBlock)> {
+        self.bbs.into_iter()
     }
 
     pub fn basic_block_map(&self) -> impl Iterator<Item = (&BBLabel, &Vec<BBLabel>)> {
@@ -571,7 +563,7 @@ mod test {
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
     use crate::three_addr_code_ir::{
-        reset_label_counter, BinaryExprOperandI, FunctionIdent, IdentI, LValueI, TempI,
+        reset_label_counter, RValueI, FunctionIdent, IdentI, LValueI, TempI,
     };
     use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
@@ -590,9 +582,9 @@ mod test {
 
         let bb_label: BBLabel = 0.into();
 
-        let seq = vec![ThreeAddressCode::PushI(BinaryExprOperandI::LValue(
+        let seq = vec![ThreeAddressCode::PushI(
             LValueI::Id(a.clone()),
-        ))];
+        )];
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 
@@ -600,7 +592,7 @@ mod test {
         let expected_liveness_decorated_bb = LivenessDecoratedImmutableBasicBlock {
             label: immutable_bb.label(),
             seq: vec![LivenessDecoratedThreeAddressCode {
-                tac: ThreeAddressCode::PushI(BinaryExprOperandI::LValue(LValueI::Id(a.clone()))),
+                tac: ThreeAddressCode::PushI(LValueI::Id(a.clone())),
                 liveness_metadata: LivenessMetadata::builder()
                     .gen_set({
                         let mut gen = HashSet::new();
@@ -820,18 +812,18 @@ mod test {
         // d = a + b * c
         let seq = vec![
             ThreeAddressCode::MulI {
-                lhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
-                rhs: BinaryExprOperandI::LValue(LValueI::Id(c.clone())),
+                lhs: LValueI::Id(b.clone()),
+                rhs: LValueI::Id(c.clone()),
                 temp_result: t1,
             },
             ThreeAddressCode::AddI {
-                lhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
-                rhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
+                lhs: LValueI::Temp(t1),
+                rhs: LValueI::Id(a.clone()),
                 temp_result: t2,
             },
             ThreeAddressCode::StoreI {
                 lhs: LValueI::Id(d.clone()),
-                rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
+                rhs: RValueI::LValue(LValueI::Temp(t2)),
             },
         ];
 
@@ -843,8 +835,8 @@ mod test {
             seq: vec![
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::MulI {
-                        lhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Id(c.clone())),
+                        lhs: LValueI::Id(b.clone()),
+                        rhs: LValueI::Id(c.clone()),
                         temp_result: t1,
                     },
                     liveness_metadata: LivenessMetadata::builder()
@@ -863,8 +855,8 @@ mod test {
                 },
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::AddI {
-                        lhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
+                        lhs: LValueI::Temp(t1),
+                        rhs: LValueI::Id(a.clone()),
                         temp_result: t2,
                     },
                     liveness_metadata: LivenessMetadata::builder()
@@ -884,7 +876,7 @@ mod test {
                 LivenessDecoratedThreeAddressCode {
                     tac: ThreeAddressCode::StoreI {
                         lhs: LValueI::Id(d.clone()),
-                        rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
+                        rhs: RValueI::LValue(LValueI::Temp(t2)),
                     },
                     liveness_metadata: LivenessMetadata::builder()
                         .gen_set({
@@ -991,7 +983,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Temp(t1),
-                            rhs: BinaryExprOperandI::RValue(4),
+                            rhs: RValueI::RValue(4),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .kill_set({
@@ -1010,7 +1002,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Id(a.clone()),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t1)),
+                            rhs: RValueI::LValue(LValueI::Temp(t1)),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({
@@ -1039,7 +1031,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Temp(t2),
-                            rhs: BinaryExprOperandI::RValue(2),
+                            rhs: RValueI::RValue(2),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .kill_set({
@@ -1064,7 +1056,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Id(b.clone()),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t2)),
+                            rhs: RValueI::LValue(LValueI::Temp(t2)),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({
@@ -1094,8 +1086,8 @@ mod test {
                     // MULTI a b $T3
                     LivenessDecoratedThreeAddressCode {
                         tac: MulI {
-                            lhs: BinaryExprOperandI::LValue(LValueI::Id(a.clone())),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Id(b.clone())),
+                            lhs: LValueI::Id(a.clone()),
+                            rhs: LValueI::Id(b.clone()),
                             temp_result: t3,
                         },
                         liveness_metadata: LivenessMetadata::builder()
@@ -1127,7 +1119,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Id(p.clone()),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t3)),
+                            rhs: RValueI::LValue(LValueI::Temp(t3)),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({
@@ -1156,7 +1148,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Temp(t4),
-                            rhs: BinaryExprOperandI::RValue(10),
+                            rhs: RValueI::RValue(10),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .kill_set({
@@ -1180,8 +1172,8 @@ mod test {
                     // LE p $T4 label1
                     LivenessDecoratedThreeAddressCode {
                         tac: LteI {
-                            lhs: BinaryExprOperandI::LValue(LValueI::Id(p.clone())),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t4)),
+                            lhs: LValueI::Id(p.clone()),
+                            rhs: LValueI::Temp(t4),
                             label: tac_label1,
                         },
                         liveness_metadata: LivenessMetadata::builder()
@@ -1213,7 +1205,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Temp(t5),
-                            rhs: BinaryExprOperandI::RValue(42),
+                            rhs: RValueI::RValue(42),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .kill_set({
@@ -1232,7 +1224,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Id(i.clone()),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t5)),
+                            rhs: RValueI::LValue(LValueI::Temp(t5)),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({
@@ -1292,7 +1284,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Temp(t6),
-                            rhs: BinaryExprOperandI::RValue(24),
+                            rhs: RValueI::RValue(24),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .kill_set({
@@ -1311,7 +1303,7 @@ mod test {
                     LivenessDecoratedThreeAddressCode {
                         tac: StoreI {
                             lhs: LValueI::Id(i.clone()),
-                            rhs: BinaryExprOperandI::LValue(LValueI::Temp(t6)),
+                            rhs: RValueI::LValue(LValueI::Temp(t6)),
                         },
                         liveness_metadata: LivenessMetadata::builder()
                             .gen_set({

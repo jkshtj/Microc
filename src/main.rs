@@ -6,11 +6,12 @@ mod cfg;
 mod symbol_table;
 mod three_addr_code_ir;
 mod token;
+mod register_alloc;
 
 #[macro_use]
 extern crate lalrpop_util;
 
-use crate::asm::tiny::TinyCodeSequence;
+// use crate::asm::tiny::TinyCodeSequence;
 use crate::cfg::basic_block::BBFunction;
 use crate::symbol_table::{SymbolTable, SYMBOL_TABLE};
 use crate::three_addr_code_ir::three_address_code::{

@@ -1,5 +1,5 @@
 use crate::three_addr_code_ir::{
-    BinaryExprOperandF, BinaryExprOperandI, FunctionIdent, IdentF, IdentI, IdentS, LValueF,
+    RValueF, RValueI, FunctionIdent, IdentF, IdentI, IdentS, LValueF,
     LValueI, Label, ResultType, TempF, TempI,
 };
 
@@ -7,32 +7,32 @@ use crate::three_addr_code_ir::{
 pub enum ThreeAddressCode {
     #[display(fmt = "ADDI {} {} {}", lhs, rhs, temp_result)]
     AddI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         temp_result: TempI,
     },
     #[display(fmt = "SUBI {} {} {}", lhs, rhs, temp_result)]
     SubI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         temp_result: TempI,
     },
     #[display(fmt = "MULTI {} {} {}", lhs, rhs, temp_result)]
     MulI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         temp_result: TempI,
     },
     #[display(fmt = "DIVI {} {} {}", lhs, rhs, temp_result)]
     DivI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         temp_result: TempI,
     },
     #[display(fmt = "STOREI {} {}", rhs, lhs)]
     StoreI {
         lhs: LValueI,
-        rhs: BinaryExprOperandI,
+        rhs: RValueI,
     },
     #[display(fmt = "READI {}", identifier)]
     ReadI { identifier: IdentI },
@@ -40,32 +40,32 @@ pub enum ThreeAddressCode {
     WriteI { identifier: IdentI },
     #[display(fmt = "ADDF {} {} {}", lhs, rhs, temp_result)]
     AddF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         temp_result: TempF,
     },
     #[display(fmt = "SUBF {} {} {}", lhs, rhs, temp_result)]
     SubF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         temp_result: TempF,
     },
     #[display(fmt = "MULTF {} {} {}", lhs, rhs, temp_result)]
     MulF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         temp_result: TempF,
     },
     #[display(fmt = "DIVF {} {} {}", lhs, rhs, temp_result)]
     DivF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         temp_result: TempF,
     },
     #[display(fmt = "STOREF {} {}", rhs, lhs)]
     StoreF {
         lhs: LValueF,
-        rhs: BinaryExprOperandF,
+        rhs: RValueF,
     },
     #[display(fmt = "READF {}", identifier)]
     ReadF { identifier: IdentF },
@@ -79,74 +79,74 @@ pub enum ThreeAddressCode {
     Jump(Label),
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
     GtI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
     LtI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
     GteI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
     LteI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
     NeI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
     EqI {
-        lhs: BinaryExprOperandI,
-        rhs: BinaryExprOperandI,
+        lhs: LValueI,
+        rhs: LValueI,
         label: Label,
     },
     #[display(fmt = "GT {} {} {}", lhs, rhs, label)]
     GtF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "LT {} {} {}", lhs, rhs, label)]
     LtF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "GE {} {} {}", lhs, rhs, label)]
     GteF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "LE {} {} {}", lhs, rhs, label)]
     LteF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "NE {} {} {}", lhs, rhs, label)]
     NeF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "EQ {} {} {}", lhs, rhs, label)]
     EqF {
-        lhs: BinaryExprOperandF,
-        rhs: BinaryExprOperandF,
+        lhs: LValueF,
+        rhs: LValueF,
         label: Label,
     },
     #[display(fmt = "LABEL {}", "_0.name()")]
@@ -160,9 +160,9 @@ pub enum ThreeAddressCode {
     #[display(fmt = "PUSH")]
     PushEmpty,
     #[display(fmt = "PUSH {}", _0)]
-    PushI(BinaryExprOperandI),
+    PushI(LValueI),
     #[display(fmt = "PUSH {}", _0)]
-    PushF(BinaryExprOperandF),
+    PushF(LValueF),
     #[display(fmt = "POP")]
     PopEmpty,
     #[display(fmt = "POP {}", _0)]
@@ -620,8 +620,8 @@ pub mod visit {
                             expr_code_obj.result.unwrap()
                         })
                         .map(|arg| match arg {
-                            LValue::LValueI(arg) => ThreeAddressCode::PushI(arg.into()),
-                            LValue::LValueF(arg) => ThreeAddressCode::PushF(arg.into()),
+                            LValue::LValueI(arg) => ThreeAddressCode::PushI(arg),
+                            LValue::LValueF(arg) => ThreeAddressCode::PushF(arg),
                         })
                         .collect();
 

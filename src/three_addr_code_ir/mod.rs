@@ -173,75 +173,75 @@ impl From<IdentF> for LValue {
 
 /// Integer type binary expression operand
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
-pub enum BinaryExprOperandI {
+pub enum RValueI {
     LValue(LValueI),
     RValue(i32),
 }
 
-impl BinaryExprOperandI {
+impl RValueI {
     pub fn is_mem_ref(&self) -> bool {
-        matches!(self, BinaryExprOperandI::LValue(LValueI::Id(_)))
+        matches!(self, RValueI::LValue(LValueI::Id(_)))
     }
 }
 
-impl From<TempI> for BinaryExprOperandI {
+impl From<TempI> for RValueI {
     fn from(temp: TempI) -> Self {
-        BinaryExprOperandI::LValue(LValueI::Temp(temp))
+        RValueI::LValue(LValueI::Temp(temp))
     }
 }
 
-impl From<IdentI> for BinaryExprOperandI {
+impl From<IdentI> for RValueI {
     fn from(val: IdentI) -> Self {
-        BinaryExprOperandI::LValue(LValueI::Id(val))
+        RValueI::LValue(LValueI::Id(val))
     }
 }
 
-impl From<i32> for BinaryExprOperandI {
+impl From<i32> for RValueI {
     fn from(val: i32) -> Self {
-        BinaryExprOperandI::RValue(val)
+        RValueI::RValue(val)
     }
 }
 
-impl From<LValueI> for BinaryExprOperandI {
+impl From<LValueI> for RValueI {
     fn from(lvalue: LValueI) -> Self {
-        BinaryExprOperandI::LValue(lvalue)
+        RValueI::LValue(lvalue)
     }
 }
 
 /// Float type binary expression operand
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
-pub enum BinaryExprOperandF {
+pub enum RValueF {
     LValue(LValueF),
     RValue(f64),
 }
 
-impl BinaryExprOperandF {
+impl RValueF {
     pub fn is_mem_ref(&self) -> bool {
-        matches!(self, BinaryExprOperandF::LValue(LValueF::Id(_)))
+        matches!(self, RValueF::LValue(LValueF::Id(_)))
     }
 }
 
-impl From<TempF> for BinaryExprOperandF {
+impl From<TempF> for RValueF {
     fn from(temp: TempF) -> Self {
-        BinaryExprOperandF::LValue(LValueF::Temp(temp))
+        RValueF::LValue(LValueF::Temp(temp))
     }
 }
 
-impl From<IdentF> for BinaryExprOperandF {
+impl From<IdentF> for RValueF {
     fn from(val: IdentF) -> Self {
-        BinaryExprOperandF::LValue(LValueF::Id(val))
+        RValueF::LValue(LValueF::Id(val))
     }
 }
 
-impl From<f64> for BinaryExprOperandF {
+impl From<f64> for RValueF {
     fn from(val: f64) -> Self {
-        BinaryExprOperandF::RValue(val)
+        RValueF::RValue(val)
     }
 }
 
-impl From<LValueF> for BinaryExprOperandF {
+impl From<LValueF> for RValueF {
     fn from(lvalue: LValueF) -> Self {
-        BinaryExprOperandF::LValue(lvalue)
+        RValueF::LValue(lvalue)
     }
 }
 
