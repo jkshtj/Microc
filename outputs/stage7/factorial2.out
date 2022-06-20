@@ -1,0 +1,357 @@
+;IR code
+;LABEL factorial
+;LINK
+;STOREI 1 $T1
+;NE $P1 $T1 label1
+;STOREI 1 $T2
+;STOREI $T2 $R
+;RET
+;JUMP label2
+;LABEL label1
+;STOREI 1 $T3
+;STOREI 1 $T4
+;NE $T3 $T4 label3
+;STOREI 1 $T5
+;SUBI $P1 $T5 $T6
+;PUSH 
+;PUSH $T6
+;JSR factorial
+;POP 
+;POP $T7
+;STOREI $T7 $L2
+;MULTI $L2 $P1 $T8
+;STOREI $T8 $L1
+;JUMP label2
+;LABEL label3
+;LABEL label2
+;STOREI $L1 $R
+;RET
+
+;LABEL main
+;LINK
+;WRITES input
+;READI $L1
+;STOREI 1 $T1
+;NE $L1 $T1 label4
+;STOREI 1 $T2
+;STOREI $T2 $L2
+;JUMP label5
+;LABEL label4
+;STOREI 1 $T3
+;LE $L1 $T3 label6
+;PUSH 
+;PUSH $L1
+;JSR factorial
+;POP 
+;POP $T4
+;STOREI $T4 $L2
+;JUMP label5
+;LABEL label6
+;STOREI 1 $T5
+;STOREI 1 $T6
+;NE $T5 $T6 label7
+;STOREI 0 $T7
+;STOREI $T7 $L2
+;JUMP label5
+;LABEL label7
+;LABEL label5
+;WRITEI $L2
+;WRITES eol
+;STOREI 0 $T8
+;STOREI $T8 $R
+;RET
+
+;tiny code
+str input "Please enter an integer number: "
+str eol "\n"
+push
+push r0
+push r1
+push r2
+push r3
+jsr main
+sys halt
+;LABEL factorial	 live vars: $P1, $L1, 
+label factorial
+;LINK	 live vars: $P1, $L1, 
+link 10
+;STOREI 1 $T1	 live vars: $P1, $T1, $L1, 
+;ensure(): $T1 gets register r3 { r0->null r1->null r2->null r3->$T1 }
+move 1 r3
+;NE $P1 $T1 label1	 live vars: $L1, $P1, 
+;ensure(): $P1 gets register r2 { r0->null r1->null r2->$P1 r3->$T1 }
+;loading $P1 to register r2
+move $6 r2
+;ensure(): $T1 has register r3 { r0->null r1->null r2->$P1 r3->$T1 }
+cmpi r2 r3
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r3 $-3
+;Spilling registers at the end of the Basic Block
+jne label1
+;STOREI 1 $T2	 live vars: $T2, $L1, 
+;ensure(): $T2 gets register r3 { r0->null r1->null r2->null r3->$T2 }
+move 1 r3
+;STOREI $T2 $R	 live vars: $L1, 
+;ensure(): $T2 has register r3 { r0->null r1->null r2->null r3->$T2 }
+move r3 $7
+;Freeing unused variable $T2
+;Spilling variable: $T2
+move r3 $-4
+;RET	 live vars: $L1, 
+unlnk
+ret
+;JUMP label2	 live vars: $L1, 
+;Spilling registers at the end of the Basic Block
+jmp label2
+;LABEL label1	 live vars: $L1, $P1, 
+label label1
+;STOREI 1 $T3	 live vars: $T3, $L1, $P1, 
+;ensure(): $T3 gets register r3 { r0->null r1->null r2->null r3->$T3 }
+move 1 r3
+;STOREI 1 $T4	 live vars: $T3, $T4, $L1, $P1, 
+;ensure(): $T4 gets register r2 { r0->null r1->null r2->$T4 r3->$T3 }
+move 1 r2
+;NE $T3 $T4 label3	 live vars: $L1, $P1, 
+;ensure(): $T3 has register r3 { r0->null r1->null r2->$T4 r3->$T3 }
+;ensure(): $T4 has register r2 { r0->null r1->null r2->$T4 r3->$T3 }
+cmpi r3 r2
+;Freeing unused variable $T3
+;Spilling variable: $T3
+move r3 $-5
+;Freeing unused variable $T4
+;Spilling variable: $T4
+move r2 $-6
+;Spilling registers at the end of the Basic Block
+jne label3
+;STOREI 1 $T5	 live vars: $P1, $T5, 
+;ensure(): $T5 gets register r3 { r0->null r1->null r2->null r3->$T5 }
+move 1 r3
+;SUBI $P1 $T5 $T6	 live vars: $T6, $P1, 
+;ensure(): $P1 gets register r2 { r0->null r1->null r2->$P1 r3->$T5 }
+;loading $P1 to register r2
+move $6 r2
+;ensure(): $T5 has register r3 { r0->null r1->null r2->$P1 r3->$T5 }
+;Switching owner of register r2 to $T6 { r0->null r1->null r2->$P1 r3->$T5 }
+subi r3 r2
+;Freeing unused variable $T5
+;Spilling variable: $T5
+move r3 $-7
+;PUSH 	 live vars: $T6, $P1, 
+push 
+;PUSH $T6	 live vars: $P1, 
+;ensure(): $T6 has register r2 { r0->null r1->null r2->$T6 r3->null }
+push r2
+;Freeing unused variable $T6
+;Spilling variable: $T6
+move r2 $-8
+;JSR factorial	 live vars: $P1, 
+push r0
+push r1
+push r2
+push r3
+jsr factorial
+pop r3
+pop r2
+pop r1
+pop r0
+;POP 	 live vars: $P1, 
+pop 
+;POP $T7	 live vars: $T7, $P1, 
+;ensure(): $T7 gets register r3 { r0->null r1->null r2->null r3->$T7 }
+pop r3
+;STOREI $T7 $L2	 live vars: $L2, $P1, 
+;ensure(): $T7 has register r3 { r0->null r1->null r2->null r3->$T7 }
+;ensure(): $L2 gets register r2 { r0->null r1->null r2->$L2 r3->$T7 }
+move r3 r2
+;Freeing unused variable $T7
+;Spilling variable: $T7
+move r3 $-9
+;MULTI $L2 $P1 $T8	 live vars: $T8, 
+;ensure(): $L2 has register r2 { r0->null r1->null r2->$L2 r3->null }
+;ensure(): $P1 gets register r3 { r0->null r1->null r2->$L2 r3->$P1 }
+;loading $P1 to register r3
+move $6 r3
+;Switching owner of register r2 to $T8 { r0->null r1->null r2->$L2 r3->$P1 }
+;Spilling variable: $L2
+move r2 $-2
+muli r3 r2
+;Freeing unused variable $P1
+;STOREI $T8 $L1	 live vars: $L1, 
+;ensure(): $T8 has register r2 { r0->null r1->null r2->$T8 r3->null }
+;ensure(): $L1 gets register r3 { r0->null r1->null r2->$T8 r3->$L1 }
+move r2 r3
+;Freeing unused variable $T8
+;Spilling variable: $T8
+move r2 $-10
+;JUMP label2	 live vars: $L1, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: $L1
+move r3 $-1
+jmp label2
+;LABEL label3	 live vars: $L1, 
+label label3
+;Spilling registers at the end of the Basic Block
+;LABEL label2	 live vars: $L1, 
+label label2
+;STOREI $L1 $R	 live vars: 
+;ensure(): $L1 gets register r3 { r0->null r1->null r2->null r3->$L1 }
+;loading $L1 to register r3
+move $-1 r3
+move r3 $7
+;Freeing unused variable $L1
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+;LABEL main	 live vars: input, $L2, eol, 
+label main
+;LINK	 live vars: input, $L2, eol, 
+link 10
+;WRITES input	 live vars: $L2, eol, 
+sys writes input
+;READI $L1	 live vars: $L1, $L2, eol, 
+;ensure(): $L1 gets register r3 { r0->null r1->null r2->null r3->$L1 }
+sys readi r3
+;STOREI 1 $T1	 live vars: $L1, $T1, $L2, eol, 
+;ensure(): $T1 gets register r2 { r0->null r1->null r2->$T1 r3->$L1 }
+move 1 r2
+;NE $L1 $T1 label4	 live vars: $L1, $L2, eol, 
+;ensure(): $L1 has register r3 { r0->null r1->null r2->$T1 r3->$L1 }
+;ensure(): $T1 has register r2 { r0->null r1->null r2->$T1 r3->$L1 }
+cmpi r3 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r2 $-3
+;Spilling registers at the end of the Basic Block
+;Spilling variable: $L1
+move r3 $-1
+jne label4
+;STOREI 1 $T2	 live vars: $T2, eol, 
+;ensure(): $T2 gets register r3 { r0->null r1->null r2->null r3->$T2 }
+move 1 r3
+;STOREI $T2 $L2	 live vars: $L2, eol, 
+;ensure(): $T2 has register r3 { r0->null r1->null r2->null r3->$T2 }
+;ensure(): $L2 gets register r2 { r0->null r1->null r2->$L2 r3->$T2 }
+move r3 r2
+;Freeing unused variable $T2
+;Spilling variable: $T2
+move r3 $-4
+;JUMP label5	 live vars: $L2, eol, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: $L2
+move r2 $-2
+jmp label5
+;LABEL label4	 live vars: $L1, $L2, eol, 
+label label4
+;STOREI 1 $T3	 live vars: $L1, $T3, $L2, eol, 
+;ensure(): $T3 gets register r3 { r0->null r1->null r2->null r3->$T3 }
+move 1 r3
+;LE $L1 $T3 label6	 live vars: $L2, eol, $L1, 
+;ensure(): $L1 gets register r2 { r0->null r1->null r2->$L1 r3->$T3 }
+;loading $L1 to register r2
+move $-1 r2
+;ensure(): $T3 has register r3 { r0->null r1->null r2->$L1 r3->$T3 }
+cmpi r2 r3
+;Freeing unused variable $T3
+;Spilling variable: $T3
+move r3 $-5
+;Spilling registers at the end of the Basic Block
+jle label6
+;PUSH 	 live vars: $L1, eol, 
+push 
+;PUSH $L1	 live vars: eol, 
+;ensure(): $L1 gets register r3 { r0->null r1->null r2->null r3->$L1 }
+;loading $L1 to register r3
+move $-1 r3
+push r3
+;Freeing unused variable $L1
+;JSR factorial	 live vars: eol, 
+push r0
+push r1
+push r2
+push r3
+jsr factorial
+pop r3
+pop r2
+pop r1
+pop r0
+;POP 	 live vars: eol, 
+pop 
+;POP $T4	 live vars: $T4, eol, 
+;ensure(): $T4 gets register r3 { r0->null r1->null r2->null r3->$T4 }
+pop r3
+;STOREI $T4 $L2	 live vars: $L2, eol, 
+;ensure(): $T4 has register r3 { r0->null r1->null r2->null r3->$T4 }
+;ensure(): $L2 gets register r2 { r0->null r1->null r2->$L2 r3->$T4 }
+move r3 r2
+;Freeing unused variable $T4
+;Spilling variable: $T4
+move r3 $-6
+;JUMP label5	 live vars: $L2, eol, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: $L2
+move r2 $-2
+jmp label5
+;LABEL label6	 live vars: $L2, eol, 
+label label6
+;STOREI 1 $T5	 live vars: $T5, $L2, eol, 
+;ensure(): $T5 gets register r3 { r0->null r1->null r2->null r3->$T5 }
+move 1 r3
+;STOREI 1 $T6	 live vars: $T5, $T6, $L2, eol, 
+;ensure(): $T6 gets register r2 { r0->null r1->null r2->$T6 r3->$T5 }
+move 1 r2
+;NE $T5 $T6 label7	 live vars: $L2, eol, 
+;ensure(): $T5 has register r3 { r0->null r1->null r2->$T6 r3->$T5 }
+;ensure(): $T6 has register r2 { r0->null r1->null r2->$T6 r3->$T5 }
+cmpi r3 r2
+;Freeing unused variable $T5
+;Spilling variable: $T5
+move r3 $-7
+;Freeing unused variable $T6
+;Spilling variable: $T6
+move r2 $-8
+;Spilling registers at the end of the Basic Block
+jne label7
+;STOREI 0 $T7	 live vars: $T7, eol, 
+;ensure(): $T7 gets register r3 { r0->null r1->null r2->null r3->$T7 }
+move 0 r3
+;STOREI $T7 $L2	 live vars: $L2, eol, 
+;ensure(): $T7 has register r3 { r0->null r1->null r2->null r3->$T7 }
+;ensure(): $L2 gets register r2 { r0->null r1->null r2->$L2 r3->$T7 }
+move r3 r2
+;Freeing unused variable $T7
+;Spilling variable: $T7
+move r3 $-9
+;JUMP label5	 live vars: $L2, eol, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: $L2
+move r2 $-2
+jmp label5
+;LABEL label7	 live vars: $L2, eol, 
+label label7
+;Spilling registers at the end of the Basic Block
+;LABEL label5	 live vars: $L2, eol, 
+label label5
+;WRITEI $L2	 live vars: eol, 
+;ensure(): $L2 gets register r3 { r0->null r1->null r2->null r3->$L2 }
+;loading $L2 to register r3
+move $-2 r3
+sys writei r3
+;Freeing unused variable $L2
+;WRITES eol	 live vars: 
+sys writes eol
+;STOREI 0 $T8	 live vars: $T8, 
+;ensure(): $T8 gets register r3 { r0->null r1->null r2->null r3->$T8 }
+move 0 r3
+;STOREI $T8 $R	 live vars: 
+;ensure(): $T8 has register r3 { r0->null r1->null r2->null r3->$T8 }
+move r3 $6
+;Freeing unused variable $T8
+;Spilling variable: $T8
+move r3 $-10
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+end

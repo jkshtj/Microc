@@ -1,0 +1,267 @@
+;IR code
+;LABEL add
+;LINK
+;ADDF $P1 $P2 $T1
+;STOREF $T1 $L1
+;STOREF $L1 $R
+;RET
+
+;LABEL multiply
+;LINK
+;MULTF $P1 $P2 $T1
+;STOREF $T1 $L1
+;STOREF $L1 $R
+;RET
+
+;LABEL main
+;LINK
+;WRITES intro
+;WRITES first
+;READF $L1
+;WRITES second
+;READF $L2
+;WRITES third
+;READF $L3
+;PUSH 
+;PUSH $L1
+;PUSH $L2
+;JSR multiply
+;POP 
+;POP 
+;POP $T1
+;STOREF $T1 $L5
+;PUSH 
+;PUSH $L5
+;PUSH $L3
+;JSR add
+;POP 
+;POP 
+;POP $T2
+;STOREF $T2 $L4
+;WRITEF $L1
+;WRITES star
+;WRITEF $L2
+;WRITES plus
+;WRITEF $L3
+;WRITES equal
+;WRITEF $L4
+;WRITES eol
+;STOREI 0 $T3
+;STOREI $T3 $R
+;RET
+
+;tiny code
+str intro "You will be asked for three float numbers\n"
+str first "Please enter the first float number: "
+str second "Please enter the second float number: "
+str third "Please enter the third float number: "
+str eol "\n"
+str star "*"
+str plus "+"
+str equal "="
+push
+push r0
+push r1
+push r2
+push r3
+jsr main
+sys halt
+;LABEL add	 live vars: $P1, $P2, 
+label add
+;LINK	 live vars: $P1, $P2, 
+link 2
+;ADDF $P1 $P2 $T1	 live vars: $T1, 
+;ensure(): $P1 gets register r3 { r0->null r1->null r2->null r3->$P1 }
+;loading $P1 to register r3
+move $7 r3
+;ensure(): $P2 gets register r2 { r0->null r1->null r2->$P2 r3->$P1 }
+;loading $P2 to register r2
+move $6 r2
+;Switching owner of register r3 to $T1 { r0->null r1->null r2->$P2 r3->$P1 }
+addr r2 r3
+;Freeing unused variable $P2
+;STOREF $T1 $L1	 live vars: $L1, 
+;ensure(): $T1 has register r3 { r0->null r1->null r2->null r3->$T1 }
+;ensure(): $L1 gets register r2 { r0->null r1->null r2->$L1 r3->$T1 }
+move r3 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r3 $-2
+;STOREF $L1 $R	 live vars: 
+;ensure(): $L1 has register r2 { r0->null r1->null r2->$L1 r3->null }
+move r2 $8
+;Freeing unused variable $L1
+;Spilling variable: $L1
+move r2 $-1
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+;LABEL multiply	 live vars: $P1, $P2, 
+label multiply
+;LINK	 live vars: $P1, $P2, 
+link 2
+;MULTF $P1 $P2 $T1	 live vars: $T1, 
+;ensure(): $P1 gets register r3 { r0->null r1->null r2->null r3->$P1 }
+;loading $P1 to register r3
+move $7 r3
+;ensure(): $P2 gets register r2 { r0->null r1->null r2->$P2 r3->$P1 }
+;loading $P2 to register r2
+move $6 r2
+;Switching owner of register r3 to $T1 { r0->null r1->null r2->$P2 r3->$P1 }
+mulr r2 r3
+;Freeing unused variable $P2
+;STOREF $T1 $L1	 live vars: $L1, 
+;ensure(): $T1 has register r3 { r0->null r1->null r2->null r3->$T1 }
+;ensure(): $L1 gets register r2 { r0->null r1->null r2->$L1 r3->$T1 }
+move r3 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r3 $-2
+;STOREF $L1 $R	 live vars: 
+;ensure(): $L1 has register r2 { r0->null r1->null r2->$L1 r3->null }
+move r2 $8
+;Freeing unused variable $L1
+;Spilling variable: $L1
+move r2 $-1
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+;LABEL main	 live vars: intro, first, second, third, star, plus, equal, eol, 
+label main
+;LINK	 live vars: intro, first, second, third, star, plus, equal, eol, 
+link 8
+;WRITES intro	 live vars: first, second, third, star, plus, equal, eol, 
+sys writes intro
+;WRITES first	 live vars: second, third, star, plus, equal, eol, 
+sys writes first
+;READF $L1	 live vars: second, third, $L1, star, plus, equal, eol, 
+;ensure(): $L1 gets register r3 { r0->null r1->null r2->null r3->$L1 }
+sys readr r3
+;WRITES second	 live vars: third, $L1, star, plus, equal, eol, 
+sys writes second
+;READF $L2	 live vars: third, $L1, $L2, star, plus, equal, eol, 
+;ensure(): $L2 gets register r2 { r0->null r1->null r2->$L2 r3->$L1 }
+sys readr r2
+;WRITES third	 live vars: $L1, $L2, star, plus, equal, eol, 
+sys writes third
+;READF $L3	 live vars: $L1, $L2, $L3, star, plus, equal, eol, 
+;ensure(): $L3 gets register r1 { r0->null r1->$L3 r2->$L2 r3->$L1 }
+sys readr r1
+;PUSH 	 live vars: $L1, $L2, $L3, star, plus, equal, eol, 
+push 
+;PUSH $L1	 live vars: $L2, $L3, $L1, star, plus, equal, eol, 
+;ensure(): $L1 has register r3 { r0->null r1->$L3 r2->$L2 r3->$L1 }
+push r3
+;PUSH $L2	 live vars: $L3, $L1, star, $L2, plus, equal, eol, 
+;ensure(): $L2 has register r2 { r0->null r1->$L3 r2->$L2 r3->$L1 }
+push r2
+;JSR multiply	 live vars: $L3, $L1, star, $L2, plus, equal, eol, 
+push r0
+push r1
+push r2
+push r3
+jsr multiply
+pop r3
+pop r2
+pop r1
+pop r0
+;POP 	 live vars: $L3, $L1, star, $L2, plus, equal, eol, 
+pop 
+;POP 	 live vars: $L3, $L1, star, $L2, plus, equal, eol, 
+pop 
+;POP $T1	 live vars: $T1, $L3, $L1, star, $L2, plus, equal, eol, 
+;ensure(): $T1 gets register r0 { r0->$T1 r1->$L3 r2->$L2 r3->$L1 }
+pop r0
+;STOREF $T1 $L5	 live vars: $L5, $L3, $L1, star, $L2, plus, equal, eol, 
+;ensure(): $T1 has register r0 { r0->$T1 r1->$L3 r2->$L2 r3->$L1 }
+;allocate() has to spill $L2
+;Spilling variable: $L2
+move r2 $-2
+;ensure(): $L5 gets register r2 { r0->$T1 r1->$L3 r2->$L5 r3->$L1 }
+move r0 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r0 $-6
+;PUSH 	 live vars: $L5, $L3, $L1, star, $L2, plus, equal, eol, 
+push 
+;PUSH $L5	 live vars: $L3, $L1, star, $L2, plus, equal, eol, 
+;ensure(): $L5 has register r2 { r0->null r1->$L3 r2->$L5 r3->$L1 }
+push r2
+;Freeing unused variable $L5
+;Spilling variable: $L5
+move r2 $-5
+;PUSH $L3	 live vars: $L1, star, $L2, plus, $L3, equal, eol, 
+;ensure(): $L3 has register r1 { r0->null r1->$L3 r2->null r3->$L1 }
+push r1
+;JSR add	 live vars: $L1, star, $L2, plus, $L3, equal, eol, 
+push r0
+push r1
+push r2
+push r3
+jsr add
+pop r3
+pop r2
+pop r1
+pop r0
+;POP 	 live vars: $L1, star, $L2, plus, $L3, equal, eol, 
+pop 
+;POP 	 live vars: $L1, star, $L2, plus, $L3, equal, eol, 
+pop 
+;POP $T2	 live vars: $T2, $L1, star, $L2, plus, $L3, equal, eol, 
+;ensure(): $T2 gets register r2 { r0->null r1->$L3 r2->$T2 r3->$L1 }
+pop r2
+;STOREF $T2 $L4	 live vars: $L1, star, $L2, plus, $L3, equal, $L4, eol, 
+;ensure(): $T2 has register r2 { r0->null r1->$L3 r2->$T2 r3->$L1 }
+;ensure(): $L4 gets register r0 { r0->$L4 r1->$L3 r2->$T2 r3->$L1 }
+move r2 r0
+;Freeing unused variable $T2
+;Spilling variable: $T2
+move r2 $-7
+;WRITEF $L1	 live vars: star, $L2, plus, $L3, equal, $L4, eol, 
+;ensure(): $L1 has register r3 { r0->$L4 r1->$L3 r2->null r3->$L1 }
+sys writer r3
+;Freeing unused variable $L1
+;Spilling variable: $L1
+move r3 $-1
+;WRITES star	 live vars: $L2, plus, $L3, equal, $L4, eol, 
+sys writes star
+;WRITEF $L2	 live vars: plus, $L3, equal, $L4, eol, 
+;ensure(): $L2 gets register r3 { r0->$L4 r1->$L3 r2->null r3->$L2 }
+;loading $L2 to register r3
+move $-2 r3
+sys writer r3
+;Freeing unused variable $L2
+;WRITES plus	 live vars: $L3, equal, $L4, eol, 
+sys writes plus
+;WRITEF $L3	 live vars: equal, $L4, eol, 
+;ensure(): $L3 has register r1 { r0->$L4 r1->$L3 r2->null r3->null }
+sys writer r1
+;Freeing unused variable $L3
+;Spilling variable: $L3
+move r1 $-3
+;WRITES equal	 live vars: $L4, eol, 
+sys writes equal
+;WRITEF $L4	 live vars: eol, 
+;ensure(): $L4 has register r0 { r0->$L4 r1->null r2->null r3->null }
+sys writer r0
+;Freeing unused variable $L4
+;Spilling variable: $L4
+move r0 $-4
+;WRITES eol	 live vars: 
+sys writes eol
+;STOREI 0 $T3	 live vars: $T3, 
+;ensure(): $T3 gets register r3 { r0->null r1->null r2->null r3->$T3 }
+move 0 r3
+;STOREI $T3 $R	 live vars: 
+;ensure(): $T3 has register r3 { r0->null r1->null r2->null r3->$T3 }
+move r3 $6
+;Freeing unused variable $T3
+;Spilling variable: $T3
+move r3 $-8
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+end

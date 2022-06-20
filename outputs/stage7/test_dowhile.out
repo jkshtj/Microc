@@ -1,0 +1,189 @@
+;IR code
+;LABEL main
+;LINK
+;STOREF 7.0 $T1
+;STOREF $T1 num
+;STOREI 100 $T2
+;STOREI $T2 i
+;STOREI 1 $T3
+;STOREI $T3 j
+;STOREF num approx
+;LABEL label1
+;STOREF 0.5 $T4
+;DIVF num approx $T5
+;ADDF approx $T5 $T6
+;MULTF $T4 $T6 $T7
+;STOREF $T7 newapprox
+;STOREF newapprox approx
+;STOREI 1 $T8
+;SUBI i $T8 $T9
+;STOREI $T9 i
+;LABEL label3
+;STOREI 0 $T10
+;EQ i $T10 label2
+;JUMP label1
+;LABEL label2
+;WRITEF approx
+;RET
+
+;tiny code
+var i
+var j
+var newapprox
+var approx
+var num
+push
+push r0
+push r1
+push r2
+push r3
+jsr main
+sys halt
+;LABEL main	 live vars: 
+label main
+;LINK	 live vars: 
+link 10
+;STOREF 7.0 $T1	 live vars: $T1, 
+;ensure(): $T1 gets register r3 { r0->null r1->null r2->null r3->$T1 }
+move 7.0 r3
+;STOREF $T1 num	 live vars: num, 
+;ensure(): $T1 has register r3 { r0->null r1->null r2->null r3->$T1 }
+;ensure(): num gets register r2 { r0->null r1->null r2->num r3->$T1 }
+move r3 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r3 $-1
+;STOREI 100 $T2	 live vars: $T2, num, 
+;ensure(): $T2 gets register r3 { r0->null r1->null r2->num r3->$T2 }
+move 100 r3
+;STOREI $T2 i	 live vars: num, i, 
+;ensure(): $T2 has register r3 { r0->null r1->null r2->num r3->$T2 }
+;ensure(): i gets register r1 { r0->null r1->i r2->num r3->$T2 }
+move r3 r1
+;Freeing unused variable $T2
+;Spilling variable: $T2
+move r3 $-2
+;STOREI 1 $T3	 live vars: $T3, num, i, 
+;ensure(): $T3 gets register r3 { r0->null r1->i r2->num r3->$T3 }
+move 1 r3
+;STOREI $T3 j	 live vars: num, i, 
+;ensure(): $T3 has register r3 { r0->null r1->i r2->num r3->$T3 }
+;ensure(): j gets register r0 { r0->j r1->i r2->num r3->$T3 }
+move r3 r0
+;Freeing unused variable $T3
+;Spilling variable: $T3
+move r3 $-3
+;Freeing unused variable j
+;Spilling variable: j
+move r0 j
+;STOREF num approx	 live vars: num, approx, i, 
+;ensure(): num has register r2 { r0->null r1->i r2->num r3->null }
+;ensure(): approx gets register r3 { r0->null r1->i r2->num r3->approx }
+move r2 r3
+;Spilling registers at the end of the Basic Block
+;Spilling variable: approx
+move r3 approx
+;Spilling variable: num
+move r2 num
+;Spilling variable: i
+move r1 i
+;LABEL label1	 live vars: num, approx, i, 
+label label1
+;STOREF 0.5 $T4	 live vars: num, approx, $T4, i, 
+;ensure(): $T4 gets register r3 { r0->null r1->null r2->null r3->$T4 }
+move 0.5 r3
+;DIVF num approx $T5	 live vars: approx, $T5, $T4, i, num, 
+;ensure(): num gets register r2 { r0->null r1->null r2->num r3->$T4 }
+;loading num to register r2
+move num r2
+;ensure(): approx gets register r1 { r0->null r1->approx r2->num r3->$T4 }
+;loading approx to register r1
+move approx r1
+;Switching owner of register r2 to $T5 { r0->null r1->approx r2->num r3->$T4 }
+divr r1 r2
+;ADDF approx $T5 $T6	 live vars: $T4, $T6, i, num, 
+;ensure(): approx has register r1 { r0->null r1->approx r2->$T5 r3->$T4 }
+;ensure(): $T5 has register r2 { r0->null r1->approx r2->$T5 r3->$T4 }
+;Switching owner of register r1 to $T6 { r0->null r1->approx r2->$T5 r3->$T4 }
+addr r2 r1
+;Freeing unused variable $T5
+;Spilling variable: $T5
+move r2 $-5
+;MULTF $T4 $T6 $T7	 live vars: $T7, i, num, 
+;ensure(): $T4 has register r3 { r0->null r1->$T6 r2->null r3->$T4 }
+;ensure(): $T6 has register r1 { r0->null r1->$T6 r2->null r3->$T4 }
+;Switching owner of register r3 to $T7 { r0->null r1->$T6 r2->null r3->$T4 }
+;Spilling variable: $T4
+move r3 $-4
+mulr r1 r3
+;Freeing unused variable $T6
+;Spilling variable: $T6
+move r1 $-6
+;STOREF $T7 newapprox	 live vars: newapprox, i, num, 
+;ensure(): $T7 has register r3 { r0->null r1->null r2->null r3->$T7 }
+;ensure(): newapprox gets register r2 { r0->null r1->null r2->newapprox r3->$T7 }
+move r3 r2
+;Freeing unused variable $T7
+;Spilling variable: $T7
+move r3 $-7
+;STOREF newapprox approx	 live vars: i, approx, num, 
+;ensure(): newapprox has register r2 { r0->null r1->null r2->newapprox r3->null }
+;ensure(): approx gets register r3 { r0->null r1->null r2->newapprox r3->approx }
+move r2 r3
+;Freeing unused variable newapprox
+;Spilling variable: newapprox
+move r2 newapprox
+;STOREI 1 $T8	 live vars: i, $T8, approx, num, 
+;ensure(): $T8 gets register r2 { r0->null r1->null r2->$T8 r3->approx }
+move 1 r2
+;SUBI i $T8 $T9	 live vars: $T9, approx, num, 
+;ensure(): i gets register r1 { r0->null r1->i r2->$T8 r3->approx }
+;loading i to register r1
+move i r1
+;ensure(): $T8 has register r2 { r0->null r1->i r2->$T8 r3->approx }
+;Switching owner of register r1 to $T9 { r0->null r1->i r2->$T8 r3->approx }
+subi r2 r1
+;Freeing unused variable $T8
+;Spilling variable: $T8
+move r2 $-8
+;STOREI $T9 i	 live vars: i, approx, num, 
+;ensure(): $T9 has register r1 { r0->null r1->$T9 r2->null r3->approx }
+;ensure(): i gets register r2 { r0->null r1->$T9 r2->i r3->approx }
+move r1 r2
+;Freeing unused variable $T9
+;Spilling variable: $T9
+move r1 $-9
+;LABEL label3	 live vars: i, approx, num, 
+label label3
+;STOREI 0 $T10	 live vars: i, $T10, approx, num, 
+;ensure(): $T10 gets register r1 { r0->null r1->$T10 r2->i r3->approx }
+move 0 r1
+;EQ i $T10 label2	 live vars: approx, num, i, 
+;ensure(): i has register r2 { r0->null r1->$T10 r2->i r3->approx }
+;ensure(): $T10 has register r1 { r0->null r1->$T10 r2->i r3->approx }
+cmpi r2 r1
+;Freeing unused variable $T10
+;Spilling variable: $T10
+move r1 $-10
+;Spilling registers at the end of the Basic Block
+;Spilling variable: approx
+move r3 approx
+;Spilling variable: i
+move r2 i
+jeq label2
+;JUMP label1	 live vars: num, approx, i, 
+;Spilling registers at the end of the Basic Block
+jmp label1
+;LABEL label2	 live vars: approx, 
+label label2
+;WRITEF approx	 live vars: 
+;ensure(): approx gets register r3 { r0->null r1->null r2->null r3->approx }
+;loading approx to register r3
+move approx r3
+sys writer r3
+;Freeing unused variable approx
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+end
