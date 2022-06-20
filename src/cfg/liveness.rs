@@ -46,6 +46,10 @@ impl LivenessMetadata {
     pub fn out_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
         Rc::clone(&self.out_set)
     }
+
+    pub fn is_var_live(&self, var: &LValue) -> bool {
+        self.out_set.borrow().contains(var)
+    }
 }
 
 /// ThreeAddressCode nodes containing liveness
@@ -254,46 +258,10 @@ impl Display for LivenessDecoratedThreeAddressCode {
             .map(|x| x.name().len())
             .max()
             .map_or(30, |x| max(x * 10, 30));
-        let space_gen = max_space - self.tac().to_string().len();
-        let space_kill = max_space
-            - self
-                .gen_set()
-                .borrow()
-                .iter()
-                .map(|x| x.to_string().len() + 2)
-                .sum::<usize>() as usize;
-        let space_in = max_space
-            - self
-                .kill_set()
-                .borrow()
-                .iter()
-                .map(|x| x.to_string().len() + 2)
-                .sum::<usize>() as usize;
-        let space_out = max_space
-            - self
-                .in_set()
-                .borrow()
-                .iter()
-                .map(|x| x.to_string().len() + 2)
-                .sum::<usize>() as usize;
+        let space = max_space - self.tac().to_string().len();
 
         write!(f, "{}", self.tac())?;
-        write!(f, "{:>space_gen$}", "| GEN: ")?;
-        self.gen_set()
-            .borrow()
-            .iter()
-            .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "{:>space_kill$}", "| KILL: ")?;
-        self.kill_set()
-            .borrow()
-            .iter()
-            .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "{:>space_in$}", "| IN: ")?;
-        self.in_set()
-            .borrow()
-            .iter()
-            .try_for_each(|x| write!(f, "{x}, "))?;
-        write!(f, "{:>space_out$}", "| OUT: ")?;
+        write!(f, "{:>space$}", "| LIVE: ")?;
         self.out_set()
             .borrow()
             .iter()

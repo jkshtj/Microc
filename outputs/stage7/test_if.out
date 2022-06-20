@@ -1,0 +1,213 @@
+;IR code
+;LABEL main
+;LINK
+;STOREI 7 $T1
+;STOREI $T1 num
+;STOREI 2 $T2
+;STOREI $T2 i
+;STOREI 42 $T3
+;STOREI $T3 a
+;STOREI 5 $T4
+;GE i $T4 label1
+;ADDI num a $T5
+;STOREI $T5 num
+;STOREI 3 $T6
+;GE i $T6 label3
+;ADDI num a $T7
+;STOREI $T7 num
+;JUMP label4
+;LABEL label3
+;LABEL label4
+;JUMP label2
+;LABEL label1
+;STOREI 5 $T8
+;LT i $T8 label5
+;SUBI num a $T9
+;STOREI $T9 num
+;JUMP label2
+;LABEL label5
+;LABEL label2
+;WRITEI num
+;RET
+
+;tiny code
+var i
+var a
+var num
+push
+push r0
+push r1
+push r2
+push r3
+jsr main
+sys halt
+;LABEL main	 live vars: 
+label main
+;LINK	 live vars: 
+link 9
+;STOREI 7 $T1	 live vars: $T1, 
+;ensure(): $T1 gets register r3 { r0->null r1->null r2->null r3->$T1 }
+move 7 r3
+;STOREI $T1 num	 live vars: num, 
+;ensure(): $T1 has register r3 { r0->null r1->null r2->null r3->$T1 }
+;ensure(): num gets register r2 { r0->null r1->null r2->num r3->$T1 }
+move r3 r2
+;Freeing unused variable $T1
+;Spilling variable: $T1
+move r3 $-1
+;STOREI 2 $T2	 live vars: $T2, num, 
+;ensure(): $T2 gets register r3 { r0->null r1->null r2->num r3->$T2 }
+move 2 r3
+;STOREI $T2 i	 live vars: i, num, 
+;ensure(): $T2 has register r3 { r0->null r1->null r2->num r3->$T2 }
+;ensure(): i gets register r1 { r0->null r1->i r2->num r3->$T2 }
+move r3 r1
+;Freeing unused variable $T2
+;Spilling variable: $T2
+move r3 $-2
+;STOREI 42 $T3	 live vars: $T3, i, num, 
+;ensure(): $T3 gets register r3 { r0->null r1->i r2->num r3->$T3 }
+move 42 r3
+;STOREI $T3 a	 live vars: i, num, a, 
+;ensure(): $T3 has register r3 { r0->null r1->i r2->num r3->$T3 }
+;ensure(): a gets register r0 { r0->a r1->i r2->num r3->$T3 }
+move r3 r0
+;Freeing unused variable $T3
+;Spilling variable: $T3
+move r3 $-3
+;STOREI 5 $T4	 live vars: i, $T4, num, a, 
+;ensure(): $T4 gets register r3 { r0->a r1->i r2->num r3->$T4 }
+move 5 r3
+;GE i $T4 label1	 live vars: i, num, a, 
+;ensure(): i has register r1 { r0->a r1->i r2->num r3->$T4 }
+;ensure(): $T4 has register r3 { r0->a r1->i r2->num r3->$T4 }
+cmpi r1 r3
+;Freeing unused variable $T4
+;Spilling variable: $T4
+move r3 $-4
+;Spilling registers at the end of the Basic Block
+;Spilling variable: num
+move r2 num
+;Spilling variable: i
+move r1 i
+;Spilling variable: a
+move r0 a
+jge label1
+;ADDI num a $T5	 live vars: $T5, i, a, 
+;ensure(): num gets register r3 { r0->null r1->null r2->null r3->num }
+;loading num to register r3
+move num r3
+;ensure(): a gets register r2 { r0->null r1->null r2->a r3->num }
+;loading a to register r2
+move a r2
+;Switching owner of register r3 to $T5 { r0->null r1->null r2->a r3->num }
+addi r2 r3
+;STOREI $T5 num	 live vars: i, num, a, 
+;ensure(): $T5 has register r3 { r0->null r1->null r2->a r3->$T5 }
+;ensure(): num gets register r1 { r0->null r1->num r2->a r3->$T5 }
+move r3 r1
+;Freeing unused variable $T5
+;Spilling variable: $T5
+move r3 $-5
+;STOREI 3 $T6	 live vars: i, $T6, num, a, 
+;ensure(): $T6 gets register r3 { r0->null r1->num r2->a r3->$T6 }
+move 3 r3
+;GE i $T6 label3	 live vars: num, a, 
+;ensure(): i gets register r0 { r0->i r1->num r2->a r3->$T6 }
+;loading i to register r0
+move i r0
+;ensure(): $T6 has register r3 { r0->i r1->num r2->a r3->$T6 }
+cmpi r0 r3
+;Freeing unused variable i
+;Freeing unused variable $T6
+;Spilling variable: $T6
+move r3 $-6
+;Spilling registers at the end of the Basic Block
+;Spilling variable: num
+move r1 num
+jge label3
+;ADDI num a $T7	 live vars: $T7, 
+;ensure(): num gets register r3 { r0->null r1->null r2->null r3->num }
+;loading num to register r3
+move num r3
+;ensure(): a gets register r2 { r0->null r1->null r2->a r3->num }
+;loading a to register r2
+move a r2
+;Switching owner of register r3 to $T7 { r0->null r1->null r2->a r3->num }
+addi r2 r3
+;Freeing unused variable a
+;STOREI $T7 num	 live vars: num, 
+;ensure(): $T7 has register r3 { r0->null r1->null r2->null r3->$T7 }
+;ensure(): num gets register r2 { r0->null r1->null r2->num r3->$T7 }
+move r3 r2
+;Freeing unused variable $T7
+;Spilling variable: $T7
+move r3 $-7
+;JUMP label4	 live vars: num, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: num
+move r2 num
+jmp label4
+;LABEL label3	 live vars: num, 
+label label3
+;Spilling registers at the end of the Basic Block
+;LABEL label4	 live vars: num, 
+label label4
+;JUMP label2	 live vars: num, 
+;Spilling registers at the end of the Basic Block
+jmp label2
+;LABEL label1	 live vars: i, num, a, 
+label label1
+;STOREI 5 $T8	 live vars: i, $T8, num, a, 
+;ensure(): $T8 gets register r3 { r0->null r1->null r2->null r3->$T8 }
+move 5 r3
+;LT i $T8 label5	 live vars: num, a, 
+;ensure(): i gets register r2 { r0->null r1->null r2->i r3->$T8 }
+;loading i to register r2
+move i r2
+;ensure(): $T8 has register r3 { r0->null r1->null r2->i r3->$T8 }
+cmpi r2 r3
+;Freeing unused variable i
+;Freeing unused variable $T8
+;Spilling variable: $T8
+move r3 $-8
+;Spilling registers at the end of the Basic Block
+jlt label5
+;SUBI num a $T9	 live vars: $T9, 
+;ensure(): num gets register r3 { r0->null r1->null r2->null r3->num }
+;loading num to register r3
+move num r3
+;ensure(): a gets register r2 { r0->null r1->null r2->a r3->num }
+;loading a to register r2
+move a r2
+;Switching owner of register r3 to $T9 { r0->null r1->null r2->a r3->num }
+subi r2 r3
+;Freeing unused variable a
+;STOREI $T9 num	 live vars: num, 
+;ensure(): $T9 has register r3 { r0->null r1->null r2->null r3->$T9 }
+;ensure(): num gets register r2 { r0->null r1->null r2->num r3->$T9 }
+move r3 r2
+;Freeing unused variable $T9
+;Spilling variable: $T9
+move r3 $-9
+;JUMP label2	 live vars: num, 
+;Spilling registers at the end of the Basic Block
+;Spilling variable: num
+move r2 num
+jmp label2
+;LABEL label5	 live vars: num, 
+label label5
+;Spilling registers at the end of the Basic Block
+;LABEL label2	 live vars: num, 
+label label2
+;WRITEI num	 live vars: 
+;ensure(): num gets register r3 { r0->null r1->null r2->null r3->num }
+;loading num to register r3
+move num r3
+sys writei r3
+;Freeing unused variable num
+;RET	 live vars: 
+unlnk
+ret
+;Spilling registers at the end of the Basic Block
+end
