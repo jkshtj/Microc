@@ -3,10 +3,10 @@
 mod asm;
 mod ast;
 mod cfg;
+mod register_alloc;
 mod symbol_table;
 mod three_addr_code_ir;
 mod token;
-mod register_alloc;
 
 #[macro_use]
 extern crate lalrpop_util;

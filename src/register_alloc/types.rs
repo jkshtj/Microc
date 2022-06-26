@@ -1,12 +1,12 @@
-use crate::symbol_table::symbol::data;
-use crate::three_addr_code_ir::{LValue, LValueI, IdentI, LValueF, IdentF, TempI, TempF};
-use std::collections::{HashSet, HashMap};
 use crate::cfg::liveness::LivenessMetadata;
-use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-use std::ops::{Index, IndexMut};
-use tracing::callsite::register;
+use crate::symbol_table::symbol::data;
 use crate::symbol_table::symbol::data::{FunctionScopedSymbol, FunctionScopedSymbolType};
+use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
+use crate::three_addr_code_ir::{IdentF, IdentI, LValue, LValueF, LValueI, TempF, TempI};
+use std::collections::{HashMap, HashSet};
+use std::ops::{Index, IndexMut};
 use std::rc::Rc;
+use tracing::callsite::register;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct RegisterId(usize);
@@ -149,23 +149,21 @@ impl RegisterFile {
     pub fn free_registers_with_global_vars(&mut self) -> Vec<Spill> {
         let mut result = vec![];
 
-        self.registers_mut()
-            .iter_mut()
-            .for_each(|register| {
-                let is_reg_val_global_var = register
-                    .value()
-                    .map_or(false, |value| value.is_global_var());
+        self.registers_mut().iter_mut().for_each(|register| {
+            let is_reg_val_global_var = register
+                .value()
+                .map_or(false, |value| value.is_global_var());
 
-                if is_reg_val_global_var {
-                    if let Some(value) = register.remove_value() {
-                        result.push(Spill {
-                            spill_type: SpillType::Store,
-                            register_id: register.id(),
-                            memory_location: value,
-                        });
-                    }
+            if is_reg_val_global_var {
+                if let Some(value) = register.remove_value() {
+                    result.push(Spill {
+                        spill_type: SpillType::Store,
+                        register_id: register.id(),
+                        memory_location: value,
+                    });
                 }
-            });
+            }
+        });
 
         result
     }
@@ -173,38 +171,44 @@ impl RegisterFile {
     pub fn free_dirty_registers(&mut self, liveness: &LivenessMetadata) -> Vec<Spill> {
         let mut result = vec![];
 
-        let dirty_register_ids: Vec<RegisterId> = self.registers()
+        let dirty_register_ids: Vec<RegisterId> = self
+            .registers()
             .iter()
             .filter(|&register| register.is_dirty())
             .map(|register| register.id())
             .collect();
 
-        dirty_register_ids
-            .into_iter()
-            .for_each(|id|
-                if let Some(spill) = self.free_register_with_liveness_check(id, liveness) {
-                    result.push(spill);
-                }
-            );
+        dirty_register_ids.into_iter().for_each(|id| {
+            if let Some(spill) = self.free_register_with_liveness_check(id, liveness) {
+                result.push(spill);
+            }
+        });
 
         result
     }
 
-    pub fn ensure_register(&mut self, operand: LValue, liveness: &LivenessMetadata) -> RegisterAllocation {
+    pub fn ensure_register(
+        &mut self,
+        operand: LValue,
+        liveness: &LivenessMetadata,
+    ) -> RegisterAllocation {
         // If operand is in a register return the register.
-        let maybe_register_containing_value = self.registers()
+        let maybe_register_containing_value = self
+            .registers()
             .iter()
-            .filter(|&register| if let Some(value) = register.value() {
-                value == &operand
-            } else {
-                false
+            .filter(|&register| {
+                if let Some(value) = register.value() {
+                    value == &operand
+                } else {
+                    false
+                }
             })
             .nth(0);
 
         if let Some(register) = maybe_register_containing_value {
             return RegisterAllocation {
                 register_id: register.id(),
-                spills: vec![]
+                spills: vec![],
             };
         }
 
@@ -227,7 +231,9 @@ impl RegisterFile {
                 allocation.add_spill(Spill {
                     spill_type: SpillType::Load,
                     register_id: allocation.register_id(),
-                    memory_location: LValue::LValueI(LValueI::Id(IdentI(data::Symbol::FunctionScopedSymbol(Rc::new(symbol))))),
+                    memory_location: LValue::LValueI(LValueI::Id(IdentI(
+                        data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                    ))),
                 });
             }
             LValue::LValueF(LValueF::Temp(temp)) => {
@@ -237,7 +243,9 @@ impl RegisterFile {
                 allocation.add_spill(Spill {
                     spill_type: SpillType::Load,
                     register_id: allocation.register_id(),
-                    memory_location: LValue::LValueF(LValueF::Id(IdentF(data::Symbol::FunctionScopedSymbol(Rc::new(symbol))))),
+                    memory_location: LValue::LValueF(LValueF::Id(IdentF(
+                        data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                    ))),
                 });
             }
             _ => {
@@ -246,22 +254,28 @@ impl RegisterFile {
                     register_id: allocation.register_id(),
                     memory_location: operand,
                 });
-            },
+            }
         }
 
         allocation
     }
 
-    pub fn allocate_register(&mut self, operand: LValue, liveness: &LivenessMetadata) -> RegisterAllocation {
+    pub fn allocate_register(
+        &mut self,
+        operand: LValue,
+        liveness: &LivenessMetadata,
+    ) -> RegisterAllocation {
         // If there is a free register, allocate it.
         let allocation = if let Some(register_id) = self.get_free_register() {
             RegisterAllocation {
                 register_id,
                 spills: vec![],
             }
-        } else { // Else, free a register and allocate it.
+        } else {
+            // Else, free a register and allocate it.
             let register_to_free = self.choose_register_to_free(liveness);
-            let maybe_store_type_spill = self.free_register_with_liveness_check(register_to_free, liveness);
+            let maybe_store_type_spill =
+                self.free_register_with_liveness_check(register_to_free, liveness);
             RegisterAllocation {
                 register_id: register_to_free,
                 spills: maybe_store_type_spill.map_or(vec![], |spill| vec![spill]),
@@ -281,7 +295,11 @@ impl RegisterFile {
         let _ = register.remove_value();
     }
 
-    fn free_register_with_liveness_check(&mut self, register_id: RegisterId, liveness: &LivenessMetadata) -> Option<Spill> {
+    fn free_register_with_liveness_check(
+        &mut self,
+        register_id: RegisterId,
+        liveness: &LivenessMetadata,
+    ) -> Option<Spill> {
         let register = &mut self[register_id];
 
         let curr_val = register.remove_value();
@@ -299,43 +317,49 @@ impl RegisterFile {
                     // which case we will not need to generate a new function scoped
                     // symbol.
                     LValue::LValueI(LValueI::Temp(temp)) => {
-                        let symbol = if let Some(symbol) = self.tempi_to_func_scoped_symbol_map.get(&temp) {
-                            symbol.clone()
-                        } else {
-                            let symbol = FunctionScopedSymbol::Int {
-                                symbol_type: FunctionScopedSymbolType::Local,
-                                index: self.stack_top_idx,
+                        let symbol =
+                            if let Some(symbol) = self.tempi_to_func_scoped_symbol_map.get(&temp) {
+                                symbol.clone()
+                            } else {
+                                let symbol = FunctionScopedSymbol::Int {
+                                    symbol_type: FunctionScopedSymbolType::Local,
+                                    index: self.stack_top_idx,
+                                };
+
+                                self.stack_top_idx += 1;
+
+                                symbol
                             };
-
-                            self.stack_top_idx += 1;
-
-                            symbol
-                        };
 
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
-                            memory_location: LValue::LValueI(LValueI::Id(IdentI(data::Symbol::FunctionScopedSymbol(Rc::new(symbol))))),
+                            memory_location: LValue::LValueI(LValueI::Id(IdentI(
+                                data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                            ))),
                         });
                     }
                     LValue::LValueF(LValueF::Temp(temp)) => {
-                        let symbol = if let Some(symbol) = self.tempf_to_func_scoped_symbol_map.get(&temp) {
-                            symbol.clone()
-                        } else {
-                            let symbol = FunctionScopedSymbol::Float {
-                                symbol_type: FunctionScopedSymbolType::Local,
-                                index: self.stack_top_idx,
+                        let symbol =
+                            if let Some(symbol) = self.tempf_to_func_scoped_symbol_map.get(&temp) {
+                                symbol.clone()
+                            } else {
+                                let symbol = FunctionScopedSymbol::Float {
+                                    symbol_type: FunctionScopedSymbolType::Local,
+                                    index: self.stack_top_idx,
+                                };
+
+                                self.stack_top_idx += 1;
+
+                                symbol
                             };
-
-                            self.stack_top_idx += 1;
-
-                            symbol
-                        };
 
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
-                            memory_location: LValue::LValueF(LValueF::Id(IdentF(data::Symbol::FunctionScopedSymbol(Rc::new(symbol))))),
+                            memory_location: LValue::LValueF(LValueF::Id(IdentF(
+                                data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                            ))),
                         });
                     }
                     _ => {
@@ -376,12 +400,15 @@ impl RegisterFile {
         //  metadata of all instructions of the basic block.
 
         // Try and find a register whose value is not live.
-        let maybe_free_register = self.registers()
+        let maybe_free_register = self
+            .registers()
             .iter()
-            .filter(|&register| if let Some(value) = register.value() {
-                !liveness.is_var_live(value)
-            } else {
-                false
+            .filter(|&register| {
+                if let Some(value) = register.value() {
+                    !liveness.is_var_live(value)
+                } else {
+                    false
+                }
             })
             .nth(0);
 

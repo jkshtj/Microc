@@ -125,7 +125,7 @@ mod test {
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
     use crate::three_addr_code_ir::{reset_label_counter, LValueI};
-    use crate::three_addr_code_ir::{RValueI, FunctionIdent, IdentI, TempI};
+    use crate::three_addr_code_ir::{FunctionIdent, IdentI, RValueI, TempI};
     use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
     use std::collections::HashMap;

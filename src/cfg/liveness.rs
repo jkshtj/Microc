@@ -4,9 +4,7 @@ use crate::symbol_table::symbol::data::DataType;
 use crate::symbol_table::symbol::{data, NumType};
 use crate::symbol_table::SymbolTable;
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-use crate::three_addr_code_ir::{
-    RValueF, RValueI, IdentF, IdentI, LValue, LValueF, LValueI,
-};
+use crate::three_addr_code_ir::{IdentF, IdentI, LValue, LValueF, LValueI, RValueF, RValueI};
 use linked_hash_map::LinkedHashMap;
 use std::cell::RefCell;
 use std::cmp::max;
@@ -362,7 +360,9 @@ impl LivenessDecoratedControlFlowGraph {
         self.bbs.iter()
     }
 
-    pub fn into_basic_blocks(self) -> impl Iterator<Item = (BBLabel, LivenessDecoratedImmutableBasicBlock)> {
+    pub fn into_basic_blocks(
+        self,
+    ) -> impl Iterator<Item = (BBLabel, LivenessDecoratedImmutableBasicBlock)> {
         self.bbs.into_iter()
     }
 
@@ -531,7 +531,7 @@ mod test {
         FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
     };
     use crate::three_addr_code_ir::{
-        reset_label_counter, RValueI, FunctionIdent, IdentI, LValueI, TempI,
+        reset_label_counter, FunctionIdent, IdentI, LValueI, RValueI, TempI,
     };
     use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
@@ -550,9 +550,7 @@ mod test {
 
         let bb_label: BBLabel = 0.into();
 
-        let seq = vec![ThreeAddressCode::PushI(
-            LValueI::Id(a.clone()),
-        )];
+        let seq = vec![ThreeAddressCode::PushI(LValueI::Id(a.clone()))];
 
         let immutable_bb: ImmutableBasicBlock = (bb_label, seq).into();
 

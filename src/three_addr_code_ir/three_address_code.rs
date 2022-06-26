@@ -1,6 +1,6 @@
 use crate::three_addr_code_ir::{
-    RValueF, RValueI, FunctionIdent, IdentF, IdentI, IdentS, LValueF,
-    LValueI, Label, ResultType, TempF, TempI,
+    FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, RValueF, RValueI, ResultType,
+    TempF, TempI,
 };
 
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
@@ -30,10 +30,7 @@ pub enum ThreeAddressCode {
         temp_result: TempI,
     },
     #[display(fmt = "STOREI {} {}", rhs, lhs)]
-    StoreI {
-        lhs: LValueI,
-        rhs: RValueI,
-    },
+    StoreI { lhs: LValueI, rhs: RValueI },
     #[display(fmt = "READI {}", identifier)]
     ReadI { identifier: IdentI },
     #[display(fmt = "WRITEI {}", identifier)]
@@ -63,10 +60,7 @@ pub enum ThreeAddressCode {
         temp_result: TempF,
     },
     #[display(fmt = "STOREF {} {}", rhs, lhs)]
-    StoreF {
-        lhs: LValueF,
-        rhs: RValueF,
-    },
+    StoreF { lhs: LValueF, rhs: RValueF },
     #[display(fmt = "READF {}", identifier)]
     ReadF { identifier: IdentF },
     #[display(fmt = "WRITEF {}", identifier)]

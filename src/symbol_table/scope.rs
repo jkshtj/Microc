@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering, AtomicUsize};
+use std::sync::atomic::{AtomicI32, AtomicU32, AtomicUsize, Ordering};
 
 static STACK_FRAME_LOCAL_SLOT_COUNTER: AtomicUsize = AtomicUsize::new(1);
 static STACK_FRAME_PARAM_SLOT_COUNTER: AtomicUsize = AtomicUsize::new(1);

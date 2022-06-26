@@ -3,10 +3,10 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ast::ast_node::Identifier;
+use crate::symbol_table::symbol::data::Symbol;
 use crate::symbol_table::symbol::NumType;
 use crate::symbol_table::symbol::{data, function};
 use std::rc::Rc;
-use crate::symbol_table::symbol::data::Symbol;
 
 pub mod three_address_code;
 
@@ -101,7 +101,7 @@ impl IdentI {
     pub fn is_global_var(&self) -> bool {
         match self.0 {
             Symbol::NonFunctionScopedSymbol(_) => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -124,7 +124,7 @@ impl IdentF {
     pub fn is_global_var(&self) -> bool {
         match self.0 {
             Symbol::NonFunctionScopedSymbol(_) => true,
-            _ => false
+            _ => false,
         }
     }
 }
