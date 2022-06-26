@@ -90,12 +90,12 @@ pub mod data {
         #[display(fmt = "${}{}", symbol_type, index)]
         Int {
             symbol_type: FunctionScopedSymbolType,
-            index: u32,
+            index: usize,
         },
         #[display(fmt = "${}{}", symbol_type, index)]
         Float {
             symbol_type: FunctionScopedSymbolType,
-            index: u32,
+            index: usize,
         },
     }
 }

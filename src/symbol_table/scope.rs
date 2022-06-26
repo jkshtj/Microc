@@ -11,16 +11,16 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::panic::panic_any;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering, AtomicUsize};
 
-static STACK_FRAME_LOCAL_SLOT_COUNTER: AtomicU32 = AtomicU32::new(1);
-static STACK_FRAME_PARAM_SLOT_COUNTER: AtomicU32 = AtomicU32::new(1);
+static STACK_FRAME_LOCAL_SLOT_COUNTER: AtomicUsize = AtomicUsize::new(1);
+static STACK_FRAME_PARAM_SLOT_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 pub fn reset_stack_frame_local_slot_counter() {
     STACK_FRAME_LOCAL_SLOT_COUNTER.store(1, Ordering::SeqCst);
 }
 
-pub fn get_stack_frame_local_slot_counter() -> u32 {
+pub fn get_stack_frame_local_slot_counter() -> usize {
     STACK_FRAME_LOCAL_SLOT_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
@@ -28,7 +28,7 @@ pub fn reset_stack_frame_param_slot_counter() {
     STACK_FRAME_PARAM_SLOT_COUNTER.store(1, Ordering::SeqCst);
 }
 
-pub fn get_stack_frame_param_slot_counter() -> u32 {
+pub fn get_stack_frame_param_slot_counter() -> usize {
     STACK_FRAME_PARAM_SLOT_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 

@@ -6,6 +6,7 @@ use crate::ast::ast_node::Identifier;
 use crate::symbol_table::symbol::NumType;
 use crate::symbol_table::symbol::{data, function};
 use std::rc::Rc;
+use crate::symbol_table::symbol::data::Symbol;
 
 pub mod three_address_code;
 
@@ -58,6 +59,10 @@ impl TempI {
     pub fn new() -> Self {
         Self(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
     }
+
+    pub fn to_lvalue(&self) -> LValue {
+        self.clone().into()
+    }
 }
 
 #[cfg(test)]
@@ -78,11 +83,28 @@ impl TempF {
     pub fn new() -> Self {
         Self(TEMP_COUNTER.fetch_add(1, Ordering::SeqCst))
     }
+
+    pub fn to_lvalue(&self) -> LValue {
+        self.clone().into()
+    }
 }
 
 /// Int identifier
 #[derive(Debug, derive_more::Display, Clone, Eq, PartialEq, Hash)]
 pub struct IdentI(pub data::Symbol);
+
+impl IdentI {
+    pub fn to_lvalue(&self) -> LValue {
+        LValue::LValueI(LValueI::Id(self.clone()))
+    }
+
+    pub fn is_global_var(&self) -> bool {
+        match self.0 {
+            Symbol::NonFunctionScopedSymbol(_) => true,
+            _ => false
+        }
+    }
+}
 
 impl From<Identifier> for IdentI {
     fn from(id: Identifier) -> Self {
@@ -93,6 +115,19 @@ impl From<Identifier> for IdentI {
 /// Float identifier
 #[derive(Debug, derive_more::Display, Clone, Eq, PartialEq, Hash)]
 pub struct IdentF(pub data::Symbol);
+
+impl IdentF {
+    pub fn to_lvalue(&self) -> LValue {
+        LValue::LValueF(LValueF::Id(self.clone()))
+    }
+
+    pub fn is_global_var(&self) -> bool {
+        match self.0 {
+            Symbol::NonFunctionScopedSymbol(_) => true,
+            _ => false
+        }
+    }
+}
 
 impl From<Identifier> for IdentF {
     fn from(id: Identifier) -> Self {
@@ -120,6 +155,12 @@ pub enum LValueI {
     Id(IdentI),
 }
 
+impl LValueI {
+    pub fn to_lvalue(&self) -> LValue {
+        self.clone().into()
+    }
+}
+
 /// Represents an float type LValue
 /// that can either be a temporary
 /// or an float identifier.
@@ -128,6 +169,12 @@ pub enum LValueF {
     Temp(TempF),
     #[display(fmt = "{}", _0)]
     Id(IdentF),
+}
+
+impl LValueF {
+    pub fn to_lvalue(&self) -> LValue {
+        self.clone().into()
+    }
 }
 
 /// Represents an LValue that
@@ -143,6 +190,14 @@ impl LValue {
         match self {
             LValue::LValueI(_) => ResultType::Int,
             LValue::LValueF(_) => ResultType::Float,
+        }
+    }
+
+    pub fn is_global_var(&self) -> bool {
+        match self {
+            LValue::LValueI(LValueI::Id(ident)) => ident.is_global_var(),
+            LValue::LValueF(LValueF::Id(ident)) => ident.is_global_var(),
+            _ => false,
         }
     }
 }
@@ -168,6 +223,18 @@ impl From<IdentI> for LValue {
 impl From<IdentF> for LValue {
     fn from(val: IdentF) -> Self {
         LValue::LValueF(LValueF::Id(val))
+    }
+}
+
+impl From<LValueI> for LValue {
+    fn from(lvaluei: LValueI) -> Self {
+        LValue::LValueI(lvaluei)
+    }
+}
+
+impl From<LValueF> for LValue {
+    fn from(lvaluef: LValueF) -> Self {
+        LValue::LValueF(lvaluef)
     }
 }
 
@@ -272,5 +339,9 @@ pub struct FunctionIdent(pub Rc<function::Symbol>);
 impl FunctionIdent {
     pub fn name(&self) -> &str {
         self.0.name()
+    }
+
+    pub fn num_locals(&self) -> usize {
+        self.0.num_locals()
     }
 }
