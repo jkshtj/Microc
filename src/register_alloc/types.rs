@@ -6,10 +6,22 @@ use crate::three_addr_code_ir::{IdentF, IdentI, LValue, LValueF, LValueI, TempF,
 use std::collections::{HashMap, HashSet};
 use std::ops::{Index, IndexMut};
 use std::rc::Rc;
-use tracing::callsite::register;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct RegisterId(usize);
+
+impl RegisterId {
+    pub fn into_inner(self) -> usize {
+        self.0
+    }
+}
+
+#[cfg(test)]
+impl From<u32> for RegisterId {
+    fn from(id: u32) -> Self {
+        Self(id)
+    }
+}
 
 impl Index<RegisterId> for RegisterFile {
     type Output = Register;
@@ -62,18 +74,33 @@ impl Register {
 /// `Store` happens when there are no free registers and a
 /// dirty register needs to be freed by writing its value to
 /// the tracked memory location.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SpillType {
     Load,
     Store,
 }
 
 /// Represents a register spill.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Spill {
     spill_type: SpillType,
     register_id: RegisterId,
-    memory_location: LValue,
+    memory_location: data::Symbol,
+}
+
+impl Spill {
+    #[cfg(test)]
+    pub fn new(spill_type: SpillType, register_id: RegisterId, memory_location: data::Symbol) -> Self {
+        Self {
+            spill_type,
+            register_id,
+            memory_location
+        }
+    }
+
+    pub fn into_parts(self) -> (SpillType, RegisterId, data::Symbol) {
+        (self.spill_type, self.register_id, self.memory_location)
+    }
 }
 
 /// Represents the result of a register allocation.
@@ -109,7 +136,6 @@ impl RegisterAllocation {
 /// during register allocation.
 #[derive(Debug)]
 pub struct RegisterFile {
-    size: usize,
     registers: Vec<Register>,
     /// Current stack top value for the
     /// function we're register allocating
@@ -134,12 +160,31 @@ impl RegisterFile {
             .collect();
 
         Self {
-            size,
             registers,
             stack_top_idx: 0,
             tempi_to_func_scoped_symbol_map: HashMap::new(),
             tempf_to_func_scoped_symbol_map: HashMap::new(),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.registers.len()
+    }
+
+    pub fn get_func_scoped_symbol_for_temp_int(&self, temp: TempI) -> Option<&FunctionScopedSymbol> {
+        self.tempi_to_func_scoped_symbol_map.get(&temp)
+    }
+
+    pub fn add_func_scoped_symbol_for_temp_int(&mut self, temp: TempI, symbol: FunctionScopedSymbol) {
+        let _ = self.tempi_to_func_scoped_symbol_map.insert(temp, symbol);
+    }
+
+    pub fn get_func_scoped_symbol_for_temp_float(&self, temp: TempF) -> Option<&FunctionScopedSymbol> {
+        self.tempf_to_func_scoped_symbol_map.get(&temp)
+    }
+
+    pub fn add_func_scoped_symbol_for_temp_float(&mut self, temp: TempF, symbol: FunctionScopedSymbol) {
+        let _ = self.tempf_to_func_scoped_symbol_map.insert(temp, symbol);
     }
 
     pub fn set_stack_top_idx(&mut self, stack_top_idx: usize) {
@@ -155,12 +200,17 @@ impl RegisterFile {
                 .map_or(false, |value| value.is_global_var());
 
             if is_reg_val_global_var {
-                if let Some(value) = register.remove_value() {
-                    result.push(Spill {
-                        spill_type: SpillType::Store,
-                        register_id: register.id(),
-                        memory_location: value,
-                    });
+                let global_var = register.remove_value();
+                match global_var {
+                    Some(LValue::LValueI(LValueI::Id(IdentI(symbol)))) |
+                    Some(LValue::LValueF(LValueF::Id(IdentF(symbol)))) => {
+                        result.push(Spill {
+                            spill_type: SpillType::Store,
+                            register_id: register.id(),
+                            memory_location: symbol,
+                        });
+                    }
+                    _ => {}
                 }
             }
         });
@@ -191,6 +241,7 @@ impl RegisterFile {
         &mut self,
         operand: LValue,
         liveness: &LivenessMetadata,
+        needs_load_spill: bool
     ) -> RegisterAllocation {
         // If operand is in a register return the register.
         let maybe_register_containing_value = self
@@ -215,45 +266,44 @@ impl RegisterFile {
         // Else, allocate a register for the operand.
         let mut allocation = self.allocate_register(operand.clone(), liveness);
 
-        // Since the operand is being used (GENed) (and
-        // not defined (KILLed)), generate a `Load` type
-        // spill as well.
-        match &operand {
-            // If `operand` is a temporary it must have been spilled
-            // to the stack earlier in the program and we should have
-            // generated a function scoped symbol to keep track of it.
-            // Let's get the associated function scoped symbol that we
-            // assigned to it and generate a load type spill using it.
-            LValue::LValueI(LValueI::Temp(temp)) => {
-                let symbol = self.tempi_to_func_scoped_symbol_map.get(temp)
-                    .expect("Expected an existing function scoped for the int temporary but associated function scoped symbol found.")
-                    .clone();
-                allocation.add_spill(Spill {
-                    spill_type: SpillType::Load,
-                    register_id: allocation.register_id(),
-                    memory_location: LValue::LValueI(LValueI::Id(IdentI(
-                        data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
-                    ))),
-                });
-            }
-            LValue::LValueF(LValueF::Temp(temp)) => {
-                let symbol = self.tempf_to_func_scoped_symbol_map.get(temp)
-                    .expect("Expected an existing function scoped for the int temporary but associated function scoped symbol found.")
-                    .clone();
-                allocation.add_spill(Spill {
-                    spill_type: SpillType::Load,
-                    register_id: allocation.register_id(),
-                    memory_location: LValue::LValueF(LValueF::Id(IdentF(
-                        data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
-                    ))),
-                });
-            }
-            _ => {
-                allocation.add_spill(Spill {
-                    spill_type: SpillType::Load,
-                    register_id: allocation.register_id(),
-                    memory_location: operand,
-                });
+        if needs_load_spill {
+            // Since the operand is being used (GENed) (and
+            // not defined (KILLed)), generate a `Load` type
+            // spill as well.
+            match operand {
+                // If `operand` is a temporary it must have already
+                // an associated function scoped symbol, at this point,
+                // that we assigned to it when we allocated it a register.
+                // We will generate a load type spill using this function
+                // scoped symbol.
+                LValue::LValueI(LValueI::Temp(temp)) => {
+                    let symbol = self.get_func_scoped_symbol_for_temp_int(temp)
+                        .expect("Expected an existing function scoped symbol for the int temporary but no associated function scoped symbol found.")
+                        .clone();
+                    allocation.add_spill(Spill {
+                        spill_type: SpillType::Load,
+                        register_id: allocation.register_id(),
+                        memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                    });
+                }
+                LValue::LValueF(LValueF::Temp(temp)) => {
+                    let symbol = self.get_func_scoped_symbol_for_temp_float(temp)
+                        .expect("Expected an existing function scoped symbol for the float temporary but no associated function scoped symbol found.")
+                        .clone();
+                    allocation.add_spill(Spill {
+                        spill_type: SpillType::Load,
+                        register_id: allocation.register_id(),
+                        memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
+                    });
+                }
+                LValue::LValueI(LValueI::Id(IdentI(symbol))) |
+                LValue::LValueF(LValueF::Id(IdentF(symbol)))=> {
+                    allocation.add_spill(Spill {
+                        spill_type: SpillType::Load,
+                        register_id: allocation.register_id(),
+                        memory_location: symbol,
+                    });
+                }
             }
         }
 
@@ -266,7 +316,7 @@ impl RegisterFile {
         liveness: &LivenessMetadata,
     ) -> RegisterAllocation {
         // If there is a free register, allocate it.
-        let allocation = if let Some(register_id) = self.get_free_register() {
+        let allocation = if let Some(register_id) = self.get_free_register(liveness) {
             RegisterAllocation {
                 register_id,
                 spills: vec![],
@@ -281,6 +331,39 @@ impl RegisterFile {
                 spills: maybe_store_type_spill.map_or(vec![], |spill| vec![spill]),
             }
         };
+
+        // If the operand to which we're allocating a register
+        // is a temporary then we need to generate a function scoped
+        // symbol for it. We will use this function scoped symbol
+        // when we're generating spills for it while using it in
+        // future instructions.
+        match &operand {
+            LValue::LValueI(LValueI::Temp(temp)) => {
+                if self.get_func_scoped_symbol_for_temp_int(*temp).is_none() {
+                    let symbol = FunctionScopedSymbol::Int {
+                        symbol_type: FunctionScopedSymbolType::Local,
+                        index: self.stack_top_idx,
+                    };
+
+                    self.stack_top_idx += 1;
+
+                    self.add_func_scoped_symbol_for_temp_int(*temp, symbol.clone());
+                }
+            }
+            LValue::LValueF(LValueF::Temp(temp)) => {
+                if self.get_func_scoped_symbol_for_temp_float(*temp).is_none() {
+                    let symbol = FunctionScopedSymbol::Float {
+                        symbol_type: FunctionScopedSymbolType::Local,
+                        index: self.stack_top_idx,
+                    };
+
+                    self.stack_top_idx += 1;
+
+                    self.add_func_scoped_symbol_for_temp_float(*temp, symbol.clone());
+                }
+            }
+            _ => {}
+        }
 
         // Finally, associate operand to the newly allocated register.
         // to the operand.
@@ -305,68 +388,39 @@ impl RegisterFile {
         let curr_val = register.remove_value();
 
         // If register is dirty and its current value
-        // is live a `Store` type register spill must
+        // is live, a `Store` type register spill must
         // be generated.
         if let Some(value) = curr_val {
             if liveness.is_var_live(&value) {
                 match value {
-                    // If the current value stored in the register is a temporary
-                    // which is live, then we should spill it to the stack as a new
-                    // function scoped symbol. The temporary may already have been
-                    // spilled to the stack at some earlier point in the program in
-                    // which case we will not need to generate a new function scoped
-                    // symbol.
                     LValue::LValueI(LValueI::Temp(temp)) => {
-                        let symbol =
-                            if let Some(symbol) = self.tempi_to_func_scoped_symbol_map.get(&temp) {
-                                symbol.clone()
-                            } else {
-                                let symbol = FunctionScopedSymbol::Int {
-                                    symbol_type: FunctionScopedSymbolType::Local,
-                                    index: self.stack_top_idx,
-                                };
-
-                                self.stack_top_idx += 1;
-
-                                symbol
-                            };
+                        let symbol = self.get_func_scoped_symbol_for_temp_int(temp)
+                            .expect("Expected an existing function scoped symbol for the int temporary but no associated function scoped symbol found.")
+                            .clone();
 
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
-                            memory_location: LValue::LValueI(LValueI::Id(IdentI(
-                                data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
-                            ))),
+                            memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
                         });
                     }
                     LValue::LValueF(LValueF::Temp(temp)) => {
-                        let symbol =
-                            if let Some(symbol) = self.tempf_to_func_scoped_symbol_map.get(&temp) {
-                                symbol.clone()
-                            } else {
-                                let symbol = FunctionScopedSymbol::Float {
-                                    symbol_type: FunctionScopedSymbolType::Local,
-                                    index: self.stack_top_idx,
-                                };
-
-                                self.stack_top_idx += 1;
-
-                                symbol
-                            };
+                        let symbol = self.get_func_scoped_symbol_for_temp_float(temp)
+                            .expect("Expected an existing function scoped symbol for the float temporary but no associated function scoped symbol found.")
+                            .clone();
 
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
-                            memory_location: LValue::LValueF(LValueF::Id(IdentF(
-                                data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
-                            ))),
+                            memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
                         });
                     }
-                    _ => {
+                    LValue::LValueI(LValueI::Id(IdentI(symbol))) |
+                    LValue::LValueF(LValueF::Id(IdentF(symbol)))=> {
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
-                            memory_location: value,
+                            memory_location: symbol,
                         });
                     }
                 }
@@ -376,7 +430,7 @@ impl RegisterFile {
         None
     }
 
-    fn registers(&self) -> &Vec<Register> {
+    pub fn registers(&self) -> &Vec<Register> {
         &self.registers
     }
 
@@ -384,10 +438,23 @@ impl RegisterFile {
         &mut self.registers
     }
 
-    fn get_free_register(&self) -> Option<RegisterId> {
+    fn get_free_register(&self, liveness: &LivenessMetadata) -> Option<RegisterId> {
         self.registers()
             .iter()
-            .filter(|&register| !register.is_dirty())
+            // Look for free registers from the end
+            .rev()
+            // While looking for a free register, check -
+            // 1. If there is a register with no associated value.
+            //              OR
+            // 2. If there is a register containing a value that
+            //    is not USED (in GEN set) and LIVE (in OUT set).
+            .filter(|&register| {
+                if let Some(value) = register.value() {
+                    !liveness.is_var_used(value) && !liveness.is_var_live(value)
+                } else {
+                    true
+                }
+            })
             .map(|register| register.id())
             .nth(0)
     }
@@ -399,15 +466,19 @@ impl RegisterFile {
         //  it is going to require knowledge of the liveness
         //  metadata of all instructions of the basic block.
 
-        // Try and find a register whose value is not live.
+        // If we are in this method, it means that there were
+        // no registers with values that were both not USED and
+        // not LIVE. That means that we're going to have to spill
+        // a register containing a value that's not USED but may be
+        // LIVE.
         let maybe_free_register = self
             .registers()
             .iter()
             .filter(|&register| {
                 if let Some(value) = register.value() {
-                    !liveness.is_var_live(value)
+                    !liveness.is_var_used(value) && liveness.is_var_live(value)
                 } else {
-                    false
+                    true
                 }
             })
             .nth(0);
@@ -417,15 +488,16 @@ impl RegisterFile {
         }
 
         // If no register with a non-live/dead value found
-        // return the first register in the register file.
-        RegisterId(0)
+        // we need to panic as register allocation is not possible
+        // in that case.
+        panic!("Register Allocation NOT possible!");
     }
 }
 
 /// Represents 3AC with the operands that may
 /// have been register allocated and may have
 /// generated register spills.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RegisterAllocatedThreeAddressCode {
     tac: ThreeAddressCode,
     register_allocations: HashMap<LValue, RegisterId>,
@@ -433,6 +505,15 @@ pub struct RegisterAllocatedThreeAddressCode {
 }
 
 impl RegisterAllocatedThreeAddressCode {
+    #[cfg(test)]
+    pub fn new_for_test(tac: ThreeAddressCode, register_allocations: HashMap<LValue, RegisterId>, spills: Vec<Spill>) -> Self {
+        Self {
+            tac,
+            register_allocations,
+            spills
+        }
+    }
+
     pub fn new(tac: ThreeAddressCode) -> Self {
         Self {
             tac,
@@ -447,5 +528,9 @@ impl RegisterAllocatedThreeAddressCode {
 
     pub fn add_register_allocation(&mut self, lvalue: LValue, register_id: RegisterId) {
         self.register_allocations.insert(lvalue, register_id);
+    }
+
+    pub fn into_parts(self) -> (ThreeAddressCode, HashMap<LValue, RegisterId>, Vec<Spill>) {
+        (self.tac, self.register_allocations, self.spills)
     }
 }

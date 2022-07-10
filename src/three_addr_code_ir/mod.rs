@@ -1,6 +1,6 @@
 //! Three Address Code Intermediate representation.
 //! Type checking should happen at this stage.
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{Ordering, AtomicUsize};
 
 use crate::ast::ast_node::Identifier;
 use crate::symbol_table::symbol::data::Symbol;
@@ -10,8 +10,8 @@ use std::rc::Rc;
 
 pub mod three_address_code;
 
-static TEMP_COUNTER: AtomicU64 = AtomicU64::new(1);
-static LABEL_COUNTER: AtomicU64 = AtomicU64::new(1);
+static TEMP_COUNTER: AtomicUsize = AtomicUsize::new(1);
+static LABEL_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// Resets the count of temporaries used so far. The
 /// method is called once at the beginning of code gen
@@ -30,20 +30,20 @@ pub fn reset_label_counter() {
 /// required to support control flow.
 #[derive(Debug, derive_more::Display, Copy, Clone, Eq, PartialEq, Hash)]
 #[display(fmt = "label{}", _0)]
-pub struct Label(u64);
+pub struct Label(usize);
 
 impl Label {
     pub fn new() -> Self {
         Self(LABEL_COUNTER.fetch_add(1, Ordering::SeqCst))
     }
-    pub fn label(&self) -> u64 {
+    pub fn label(&self) -> usize {
         self.0
     }
 }
 
 #[cfg(test)]
-impl From<u64> for Label {
-    fn from(n: u64) -> Self {
+impl From<usize> for Label {
+    fn from(n: usize) -> Self {
         Self(n)
     }
 }
@@ -53,7 +53,7 @@ impl From<u64> for Label {
 /// of int temporaries that can be created.
 #[derive(Debug, Copy, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
-pub struct TempI(u64);
+pub struct TempI(usize);
 
 impl TempI {
     pub fn new() -> Self {
@@ -66,8 +66,8 @@ impl TempI {
 }
 
 #[cfg(test)]
-impl From<u64> for TempI {
-    fn from(n: u64) -> Self {
+impl From<usize> for TempI {
+    fn from(n: usize) -> Self {
         Self(n)
     }
 }
@@ -77,7 +77,7 @@ impl From<u64> for TempI {
 /// of float temporaries that can be created.
 #[derive(Debug, Copy, Clone, derive_more::Display, Eq, PartialEq, Hash)]
 #[display(fmt = "$T{}", _0)]
-pub struct TempF(u64);
+pub struct TempF(usize);
 
 impl TempF {
     pub fn new() -> Self {

@@ -25,6 +25,21 @@ pub struct LivenessMetadata {
 }
 
 impl LivenessMetadata {
+    #[cfg(test)]
+    pub fn new(
+        gen_set: HashSet<LValue>,
+        kill_set: HashSet<LValue>,
+        in_set: HashSet<LValue>,
+        out_set: HashSet<LValue>,
+    ) -> Self {
+        Self {
+            gen_set: Rc::new(RefCell::new(gen_set)),
+            kill_set: Rc::new(RefCell::new(kill_set)),
+            in_set: Rc::new(RefCell::new(in_set)),
+            out_set: Rc::new(RefCell::new(out_set))
+        }
+    }
+
     // TODO: Create a new to prevent leaking details
     // about the inner types, so that I could return something
     // like `impl TRAIT` instead of the concrete types I'm using
@@ -48,6 +63,10 @@ impl LivenessMetadata {
     pub fn is_var_live(&self, var: &LValue) -> bool {
         self.out_set.borrow().contains(var)
     }
+
+    pub fn is_var_used(&self, var: &LValue) -> bool {
+        self.gen_set.borrow().contains(var)
+    }
 }
 
 /// ThreeAddressCode nodes containing liveness
@@ -59,6 +78,14 @@ pub struct LivenessDecoratedThreeAddressCode {
 }
 
 impl LivenessDecoratedThreeAddressCode {
+    #[cfg(test)]
+    pub fn new(tac: ThreeAddressCode, liveness_metadata: LivenessMetadata) -> Self {
+        Self {
+            tac,
+            liveness_metadata,
+        }
+    }
+
     pub fn gen_set(&self) -> Rc<RefCell<HashSet<LValue>>> {
         self.liveness_metadata.gen_set()
     }
