@@ -9,6 +9,9 @@ mod three_addr_code_ir;
 mod token;
 
 #[macro_use]
+extern crate maplit;
+
+#[macro_use]
 extern crate lalrpop_util;
 
 // use crate::asm::tiny::TinyCodeSequence;
@@ -18,6 +21,7 @@ use crate::three_addr_code_ir::three_address_code::{
     visit::ThreeAddressCodeVisitor, ThreeAddressCode,
 };
 
+use crate::asm::tiny::{TinyCodeSequence, ALLOWED_REGISTERS};
 use crate::cfg::liveness::LivenessDecoratedControlFlowGraph;
 use crate::cfg::ControlFlowGraph;
 use flexi_logger::Logger;
@@ -26,7 +30,6 @@ use std::fs::File;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read};
 use three_addr_code_ir::three_address_code::visit::CodeObject;
-use crate::asm::tiny::TinyCodeSequence;
 
 lalrpop_mod!(pub microc);
 
@@ -105,18 +108,59 @@ fn main() {
         //     .map(|code_object| Into::<BBFunction>::into(code_object))
         //     .for_each(|x| println!("{x}"));
 
+        let num_functions = result.len();
+
         result
             .into_iter()
-            .map(|ast_node| visitor.walk_ast(ast_node))
-            .map(|code_object| ControlFlowGraph::from(Into::<BBFunction>::into(code_object)))
-            .map(|cfg| LivenessDecoratedControlFlowGraph::from(cfg))
-            .map(|cfg| register_alloc::perform_register_allocation(cfg, 4))
-            .map(|register_alloc_tacs| Into::<TinyCodeSequence>::into(register_alloc_tacs))
-            .for_each(|tiny_code_seq| tiny_code_seq
-                .sequence
-                .into_iter()
-                .for_each(|code| println!("{code}"))
-            );
+            .enumerate()
+            .map(|(i, ast_node)| (i, visitor.walk_ast(ast_node)))
+            .map(|(i, code_object)| {
+                (
+                    i,
+                    ControlFlowGraph::from(Into::<BBFunction>::into(code_object)),
+                )
+            })
+            .map(|(i, cfg)| {
+                let cfg = LivenessDecoratedControlFlowGraph::from(cfg);
+                // println!("{cfg}");
+                (i, cfg)
+            })
+            .map(|(i, cfg)| {
+                (
+                    i,
+                    register_alloc::perform_register_allocation(cfg, ALLOWED_REGISTERS),
+                )
+            })
+            .map(|(i, (register_alloc_tacs, stack_space_consumed))| {
+                if i == 0 {
+                    Into::<TinyCodeSequence>::into((
+                        register_alloc_tacs,
+                        stack_space_consumed,
+                        true,
+                        false,
+                    ))
+                } else if i == num_functions - 1 {
+                    Into::<TinyCodeSequence>::into((
+                        register_alloc_tacs,
+                        stack_space_consumed,
+                        false,
+                        true,
+                    ))
+                } else {
+                    Into::<TinyCodeSequence>::into((
+                        register_alloc_tacs,
+                        stack_space_consumed,
+                        false,
+                        false,
+                    ))
+                }
+            })
+            .for_each(|tiny_code_seq| {
+                tiny_code_seq
+                    .sequence
+                    .into_iter()
+                    .for_each(|code| println!("{code}"))
+            });
 
         // let tiny_code: TinyCodeSequence = three_addr_codes.into();
         // tiny_code

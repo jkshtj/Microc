@@ -1,3 +1,4 @@
+use crate::register_alloc::types::RegisterId;
 use crate::three_addr_code_ir::{
     FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, RValueF, RValueI, ResultType,
     TempF, TempI,
@@ -185,8 +186,46 @@ impl ThreeAddressCode {
         }
     }
 
+    pub fn is_branch(&self) -> bool {
+        matches!(
+            self,
+            ThreeAddressCode::Jump(_)
+                | ThreeAddressCode::GtI { .. }
+                | ThreeAddressCode::LtI { .. }
+                | ThreeAddressCode::GteI { .. }
+                | ThreeAddressCode::LteI { .. }
+                | ThreeAddressCode::NeI { .. }
+                | ThreeAddressCode::EqI { .. }
+                | ThreeAddressCode::GtF { .. }
+                | ThreeAddressCode::LtF { .. }
+                | ThreeAddressCode::GteF { .. }
+                | ThreeAddressCode::LteF { .. }
+                | ThreeAddressCode::NeF { .. }
+                | ThreeAddressCode::EqF { .. }
+        )
+    }
+
+    pub fn is_return(&self) -> bool {
+        matches!(self, ThreeAddressCode::Ret)
+    }
+
     pub fn is_unconditional_branch(&self) -> bool {
         matches!(self, ThreeAddressCode::Jump(_))
+    }
+
+    pub fn is_link(&self) -> bool {
+        matches!(self, ThreeAddressCode::Link(_))
+    }
+
+    pub fn is_read(&self) -> bool {
+        matches!(
+            self,
+            ThreeAddressCode::ReadI { .. } | ThreeAddressCode::ReadF { .. }
+        )
+    }
+
+    pub fn is_non_empty_pop(&self) -> bool {
+        matches!(self, ThreeAddressCode::PopI(_) | ThreeAddressCode::PopF(_))
     }
 }
 

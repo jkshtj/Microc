@@ -17,8 +17,8 @@ impl RegisterId {
 }
 
 #[cfg(test)]
-impl From<u32> for RegisterId {
-    fn from(id: u32) -> Self {
+impl From<usize> for RegisterId {
+    fn from(id: usize) -> Self {
         Self(id)
     }
 }
@@ -44,6 +44,14 @@ impl IndexMut<RegisterId> for RegisterFile {
 pub struct Register {
     id: RegisterId,
     value: Option<LValue>,
+    // A register may contain a value, even
+    // a value that may be live after the
+    // immediate instruction. However, a register
+    // is considered to be dirty only when its
+    // value is manipulated while its in the
+    // register. This manipulation in our case will
+    // only happen during assignments.
+    is_dirty: bool,
 }
 
 impl Register {
@@ -55,10 +63,6 @@ impl Register {
         self.value.as_ref()
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.value.is_some()
-    }
-
     pub fn remove_value(&mut self) -> Option<LValue> {
         self.value.take()
     }
@@ -66,13 +70,30 @@ impl Register {
     pub fn set_value(&mut self, value: LValue) {
         let _ = self.value.replace(value);
     }
+
+    pub fn is_dirty(&self) -> bool {
+        self.is_dirty
+    }
+
+    pub fn set_dirty(&mut self) {
+        // A register cannot be dirty
+        // without actually containing a
+        // value.
+        if self.value.is_some() {
+            self.is_dirty = true;
+        }
+    }
+
+    pub fn set_free(&mut self) {
+        self.is_dirty = false;
+    }
 }
 
 /// Type of spill during register allocation.
 /// `Load` happens when there is a free register and value
 /// has to be read from memory.
 /// `Store` happens when there are no free registers and a
-/// dirty register needs to be freed by writing its value to
+/// LIVE register needs to be freed by writing its value to
 /// the tracked memory location.
 #[derive(Debug, Clone)]
 pub enum SpillType {
@@ -90,12 +111,20 @@ pub struct Spill {
 
 impl Spill {
     #[cfg(test)]
-    pub fn new(spill_type: SpillType, register_id: RegisterId, memory_location: data::Symbol) -> Self {
+    pub fn new(
+        spill_type: SpillType,
+        register_id: RegisterId,
+        memory_location: data::Symbol,
+    ) -> Self {
         Self {
             spill_type,
             register_id,
-            memory_location
+            memory_location,
         }
+    }
+
+    pub fn register_id(&self) -> RegisterId {
+        self.register_id
     }
 
     pub fn into_parts(self) -> (SpillType, RegisterId, data::Symbol) {
@@ -156,6 +185,7 @@ impl RegisterFile {
             .map(|n| Register {
                 id: RegisterId(n),
                 value: None,
+                is_dirty: false,
             })
             .collect();
 
@@ -167,51 +197,80 @@ impl RegisterFile {
         }
     }
 
+    pub fn reset_for_next_bb(&mut self) {
+        self.registers_mut().into_iter().for_each(|reg| {
+            let _ = reg.remove_value();
+            reg.set_free();
+        })
+    }
+
     pub fn size(&self) -> usize {
         self.registers.len()
     }
 
-    pub fn get_func_scoped_symbol_for_temp_int(&self, temp: TempI) -> Option<&FunctionScopedSymbol> {
-        self.tempi_to_func_scoped_symbol_map.get(&temp)
+    pub fn set_register_dirty(&mut self, id: RegisterId) {
+        self[id].set_dirty();
     }
 
-    pub fn add_func_scoped_symbol_for_temp_int(&mut self, temp: TempI, symbol: FunctionScopedSymbol) {
-        let _ = self.tempi_to_func_scoped_symbol_map.insert(temp, symbol);
-    }
-
-    pub fn get_func_scoped_symbol_for_temp_float(&self, temp: TempF) -> Option<&FunctionScopedSymbol> {
-        self.tempf_to_func_scoped_symbol_map.get(&temp)
-    }
-
-    pub fn add_func_scoped_symbol_for_temp_float(&mut self, temp: TempF, symbol: FunctionScopedSymbol) {
-        let _ = self.tempf_to_func_scoped_symbol_map.insert(temp, symbol);
+    pub fn stack_top_idx(&self) -> usize {
+        self.stack_top_idx
     }
 
     pub fn set_stack_top_idx(&mut self, stack_top_idx: usize) {
         self.stack_top_idx = stack_top_idx;
     }
 
-    pub fn free_registers_with_global_vars(&mut self) -> Vec<Spill> {
+    pub fn registers(&self) -> &Vec<Register> {
+        &self.registers
+    }
+
+    fn registers_mut(&mut self) -> &mut Vec<Register> {
+        &mut self.registers
+    }
+
+    pub fn get_func_scoped_symbol_for_temp_int(
+        &self,
+        temp: TempI,
+    ) -> Option<&FunctionScopedSymbol> {
+        self.tempi_to_func_scoped_symbol_map.get(&temp)
+    }
+
+    pub fn add_func_scoped_symbol_for_temp_int(
+        &mut self,
+        temp: TempI,
+        symbol: FunctionScopedSymbol,
+    ) {
+        let _ = self.tempi_to_func_scoped_symbol_map.insert(temp, symbol);
+    }
+
+    pub fn get_func_scoped_symbol_for_temp_float(
+        &self,
+        temp: TempF,
+    ) -> Option<&FunctionScopedSymbol> {
+        self.tempf_to_func_scoped_symbol_map.get(&temp)
+    }
+
+    pub fn add_func_scoped_symbol_for_temp_float(
+        &mut self,
+        temp: TempF,
+        symbol: FunctionScopedSymbol,
+    ) {
+        let _ = self.tempf_to_func_scoped_symbol_map.insert(temp, symbol);
+    }
+
+    pub fn free_registers_with_global_vars(&mut self, liveness: &LivenessMetadata) -> Vec<Spill> {
         let mut result = vec![];
 
-        self.registers_mut().iter_mut().for_each(|register| {
-            let is_reg_val_global_var = register
-                .value()
-                .map_or(false, |value| value.is_global_var());
+        let regs_with_global_vars_ids: Vec<RegisterId> = self
+            .registers()
+            .iter()
+            .filter(|&reg| reg.value().map_or(false, |value| value.is_global_var()))
+            .map(|reg| reg.id())
+            .collect();
 
-            if is_reg_val_global_var {
-                let global_var = register.remove_value();
-                match global_var {
-                    Some(LValue::LValueI(LValueI::Id(IdentI(symbol)))) |
-                    Some(LValue::LValueF(LValueF::Id(IdentF(symbol)))) => {
-                        result.push(Spill {
-                            spill_type: SpillType::Store,
-                            register_id: register.id(),
-                            memory_location: symbol,
-                        });
-                    }
-                    _ => {}
-                }
+        regs_with_global_vars_ids.into_iter().for_each(|id| {
+            if let Some(spill) = self.free_register(id, liveness) {
+                result.push(spill);
             }
         });
 
@@ -229,7 +288,7 @@ impl RegisterFile {
             .collect();
 
         dirty_register_ids.into_iter().for_each(|id| {
-            if let Some(spill) = self.free_register_with_liveness_check(id, liveness) {
+            if let Some(spill) = self.free_register(id, liveness) {
                 result.push(spill);
             }
         });
@@ -241,7 +300,7 @@ impl RegisterFile {
         &mut self,
         operand: LValue,
         liveness: &LivenessMetadata,
-        needs_load_spill: bool
+        needs_load_spill: bool,
     ) -> RegisterAllocation {
         // If operand is in a register return the register.
         let maybe_register_containing_value = self
@@ -271,7 +330,7 @@ impl RegisterFile {
             // not defined (KILLed)), generate a `Load` type
             // spill as well.
             match operand {
-                // If `operand` is a temporary it must have already
+                // If `operand` is a temporary it must already have
                 // an associated function scoped symbol, at this point,
                 // that we assigned to it when we allocated it a register.
                 // We will generate a load type spill using this function
@@ -296,8 +355,8 @@ impl RegisterFile {
                         memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
                     });
                 }
-                LValue::LValueI(LValueI::Id(IdentI(symbol))) |
-                LValue::LValueF(LValueF::Id(IdentF(symbol)))=> {
+                LValue::LValueI(LValueI::Id(IdentI(symbol)))
+                | LValue::LValueF(LValueF::Id(IdentF(symbol))) => {
                     allocation.add_spill(Spill {
                         spill_type: SpillType::Load,
                         register_id: allocation.register_id(),
@@ -324,8 +383,7 @@ impl RegisterFile {
         } else {
             // Else, free a register and allocate it.
             let register_to_free = self.choose_register_to_free(liveness);
-            let maybe_store_type_spill =
-                self.free_register_with_liveness_check(register_to_free, liveness);
+            let maybe_store_type_spill = self.free_register(register_to_free, liveness);
             RegisterAllocation {
                 register_id: register_to_free,
                 spills: maybe_store_type_spill.map_or(vec![], |spill| vec![spill]),
@@ -373,12 +431,7 @@ impl RegisterFile {
         allocation
     }
 
-    pub fn free_register(&mut self, register_id: RegisterId) {
-        let register = &mut self[register_id];
-        let _ = register.remove_value();
-    }
-
-    fn free_register_with_liveness_check(
+    pub fn free_register(
         &mut self,
         register_id: RegisterId,
         liveness: &LivenessMetadata,
@@ -391,7 +444,10 @@ impl RegisterFile {
         // is live, a `Store` type register spill must
         // be generated.
         if let Some(value) = curr_val {
-            if liveness.is_var_live(&value) {
+            if register.is_dirty() && liveness.is_var_live(&value) {
+                // Mark register as free
+                register.set_free();
+
                 match value {
                     LValue::LValueI(LValueI::Temp(temp)) => {
                         let symbol = self.get_func_scoped_symbol_for_temp_int(temp)
@@ -415,8 +471,8 @@ impl RegisterFile {
                             memory_location: data::Symbol::FunctionScopedSymbol(Rc::new(symbol)),
                         });
                     }
-                    LValue::LValueI(LValueI::Id(IdentI(symbol))) |
-                    LValue::LValueF(LValueF::Id(IdentF(symbol)))=> {
+                    LValue::LValueI(LValueI::Id(IdentI(symbol)))
+                    | LValue::LValueF(LValueF::Id(IdentF(symbol))) => {
                         return Some(Spill {
                             spill_type: SpillType::Store,
                             register_id,
@@ -428,14 +484,6 @@ impl RegisterFile {
         }
 
         None
-    }
-
-    pub fn registers(&self) -> &Vec<Register> {
-        &self.registers
-    }
-
-    fn registers_mut(&mut self) -> &mut Vec<Register> {
-        &mut self.registers
     }
 
     fn get_free_register(&self, liveness: &LivenessMetadata) -> Option<RegisterId> {
@@ -461,7 +509,7 @@ impl RegisterFile {
 
     fn choose_register_to_free(&self, liveness: &LivenessMetadata) -> RegisterId {
         // TODO: What other heuristics can we use to determine
-        //  which register to free? Distance of point of use
+        //  which register to free? "Distance" of point of use
         //  from current instruction is one simple one however
         //  it is going to require knowledge of the liveness
         //  metadata of all instructions of the basic block.
@@ -502,16 +550,12 @@ pub struct RegisterAllocatedThreeAddressCode {
     tac: ThreeAddressCode,
     register_allocations: HashMap<LValue, RegisterId>,
     spills: Vec<Spill>,
+    end_of_bb_spills: Option<Vec<Spill>>,
 }
 
 impl RegisterAllocatedThreeAddressCode {
-    #[cfg(test)]
-    pub fn new_for_test(tac: ThreeAddressCode, register_allocations: HashMap<LValue, RegisterId>, spills: Vec<Spill>) -> Self {
-        Self {
-            tac,
-            register_allocations,
-            spills
-        }
+    pub fn tac(&self) -> &ThreeAddressCode {
+        &self.tac
     }
 
     pub fn new(tac: ThreeAddressCode) -> Self {
@@ -519,6 +563,7 @@ impl RegisterAllocatedThreeAddressCode {
             tac,
             register_allocations: HashMap::new(),
             spills: Vec::new(),
+            end_of_bb_spills: None,
         }
     }
 
@@ -530,7 +575,23 @@ impl RegisterAllocatedThreeAddressCode {
         self.register_allocations.insert(lvalue, register_id);
     }
 
-    pub fn into_parts(self) -> (ThreeAddressCode, HashMap<LValue, RegisterId>, Vec<Spill>) {
-        (self.tac, self.register_allocations, self.spills)
+    pub fn into_parts(
+        self,
+    ) -> (
+        ThreeAddressCode,
+        HashMap<LValue, RegisterId>,
+        Vec<Spill>,
+        Option<Vec<Spill>>,
+    ) {
+        (
+            self.tac,
+            self.register_allocations,
+            self.spills,
+            self.end_of_bb_spills,
+        )
+    }
+
+    pub fn add_end_of_bb_spills(&mut self, spills: Vec<Spill>) {
+        let _ = self.end_of_bb_spills.replace(spills);
     }
 }

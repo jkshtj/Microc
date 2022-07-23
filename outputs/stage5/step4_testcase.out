@@ -37,19 +37,12 @@ var a
 var b
 var i
 var p
-
-// i = 0
 move 0 r0
 move r0 i
-
-// a = 0
 move 0 r1
 move r1 a
-
-//b = 0
 move 0 r2
 move r2 b
-
 label label1
 move 10 r3
 cmpi i r3
@@ -71,13 +64,11 @@ move r8 b
 jmp label5
 label label5
 label label2
-
 move 1 r9
 move i r10
 addi r9 r10
 move r10 i
 jmp label1
-
 label label3
 sys writei a
 sys writei b

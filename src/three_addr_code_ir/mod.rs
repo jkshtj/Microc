@@ -1,6 +1,6 @@
 //! Three Address Code Intermediate representation.
 //! Type checking should happen at this stage.
-use std::sync::atomic::{Ordering, AtomicUsize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::ast::ast_node::Identifier;
 use crate::symbol_table::symbol::data::Symbol;
@@ -86,6 +86,13 @@ impl TempF {
 
     pub fn to_lvalue(&self) -> LValue {
         self.clone().into()
+    }
+}
+
+#[cfg(test)]
+impl From<usize> for TempF {
+    fn from(n: usize) -> Self {
+        Self(n)
     }
 }
 

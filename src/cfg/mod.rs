@@ -121,10 +121,10 @@ mod test {
         CodeObject, ThreeAddressCodeVisitor,
     };
     use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
-    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{
-        FunctionLabel, Jump, Label, Link, LteI, MulI, StoreI, WriteI,
+    use crate::three_addr_code_ir::three_address_code::ThreeAddressCode::{AddF, DivF, EqI, FunctionLabel, Jump, Label, Link, LteI, MulF, MulI, StoreI, SubI, WriteF, WriteI, StoreF};
+    use crate::three_addr_code_ir::{
+        reset_label_counter, IdentF, LValueF, LValueI, RValueF, TempF,
     };
-    use crate::three_addr_code_ir::{reset_label_counter, LValueI};
     use crate::three_addr_code_ir::{FunctionIdent, IdentI, RValueI, TempI};
     use linked_hash_map::LinkedHashMap;
     use serial_test::serial;
@@ -368,6 +368,340 @@ mod test {
             BB0: [BBLabel(2), BBLabel(1)]
             BB1: [BBLabel(3)]
             BB2: [BBLabel(3)]
+            ```
+        */
+        // println!("{expected_cfg}");
+        // println!("{cfg}");
+
+        assert_eq!(expected_cfg, cfg);
+    }
+
+    #[test]
+    #[serial]
+    fn bb_function_with_loops_to_cfg() {
+        reset_label_counter();
+
+        let program = r"
+            PROGRAM test
+            BEGIN
+                INT i, j;
+                FLOAT newapprox,approx,num;
+
+                FUNCTION VOID main()
+                BEGIN
+                    num := 7.0;
+                    j := 1;
+                    approx := num;
+
+                    FOR (i := 100; i != 0; i := i-1)
+                        newapprox := 0.5*(approx + num/approx);
+                        approx := newapprox;
+                    ROF
+
+                    WRITE(approx);
+                END
+            END
+        ";
+
+        let i = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "i".to_owned(),
+            },
+        )));
+        let j = IdentI(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Int {
+                name: "j".to_owned(),
+            },
+        )));
+        let newapprox = IdentF(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Float {
+                name: "newapprox".to_owned(),
+            },
+        )));
+        let approx = IdentF(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Float {
+                name: "approx".to_owned(),
+            },
+        )));
+        let num = IdentF(data::Symbol::NonFunctionScopedSymbol(Rc::new(
+            data::NonFunctionScopedSymbol::Float {
+                name: "num".to_owned(),
+            },
+        )));
+
+        let main = FunctionIdent(Rc::new(function::Symbol::new(
+            "main".to_owned(),
+            ReturnType::Void,
+            vec![],
+            vec![],
+        )));
+        let (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10): (
+            TempF,
+            TempI,
+            TempI,
+            TempI,
+            TempI,
+            TempI,
+            TempF,
+            TempF,
+            TempF,
+            TempF,
+        ) = (
+            1.into(),
+            2.into(),
+            3.into(),
+            4.into(),
+            5.into(),
+            6.into(),
+            7.into(),
+            8.into(),
+            9.into(),
+            10.into(),
+        );
+        let (tac_label1, tac_label2, tac_label3): (
+            three_addr_code_ir::Label,
+            three_addr_code_ir::Label,
+            three_addr_code_ir::Label,
+        ) = (1.into(), 2.into(), 3.into());
+        let (bb_label0, bb_label1, bb_label2, bb_label3, bb_label4): (
+            BBLabel,
+            BBLabel,
+            BBLabel,
+            BBLabel,
+            BBLabel,
+        ) = (0.into(), 1.into(), 2.into(), 3.into(), 4.into());
+
+        let mut tac_label_to_bb_label = HashMap::new();
+        tac_label_to_bb_label.insert(tac_label1, bb_label1);
+        tac_label_to_bb_label.insert(tac_label2, bb_label4);
+        tac_label_to_bb_label.insert(tac_label3, bb_label3);
+
+        let mut bbs = LinkedHashMap::new();
+        bbs.insert(
+            bb_label0,
+            (
+                bb_label0,
+                vec![
+                    // LABEL main
+                    FunctionLabel(main.clone()),
+                    // LINK
+                    Link(main),
+                    // STOREI 7, $t1
+                    StoreF {
+                        lhs: LValueF::Temp(t1),
+                        rhs: RValueF::RValue(7.0),
+                    },
+                    // STOREI $t1 num
+                    StoreF {
+                        lhs: LValueF::Id(num.clone()),
+                        rhs: RValueF::LValue(LValueF::Temp(t1)),
+                    },
+                    // STOREI 1 $T2
+                    StoreI {
+                        lhs: LValueI::Temp(t2),
+                        rhs: RValueI::RValue(1),
+                    },
+                    // STOREI $T2 j
+                    StoreI {
+                        lhs: LValueI::Id(j.clone()),
+                        rhs: RValueI::LValue(LValueI::Temp(t2)),
+                    },
+                    // STOREF num approx
+                    StoreF {
+                        lhs: LValueF::Id(approx.clone()),
+                        rhs: RValueF::LValue(LValueF::Id(num.clone())),
+                    },
+                    // STOREI 100 $T3
+                    StoreI {
+                        lhs: LValueI::Temp(t3),
+                        rhs: RValueI::RValue(100),
+                    },
+                    // STOREI $T3 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: RValueI::LValue(LValueI::Temp(t3)),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label1,
+            (
+                bb_label1,
+                vec![
+                    // LABEL label1
+                    Label(tac_label1),
+                    // STOREI 0 $T4
+                    StoreI {
+                        lhs: LValueI::Temp(t4),
+                        rhs: RValueI::RValue(0),
+                    },
+                    // EQ i $T4 label2
+                    EqI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: LValueI::Temp(t4),
+                        label: tac_label2,
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label2,
+            (
+                bb_label2,
+                vec![
+                    // STOREF 0.5 $T7
+                    StoreF {
+                        lhs: LValueF::Temp(t7),
+                        rhs: RValueF::RValue(0.5),
+                    },
+                    // DIVF num approx $T8
+                    DivF {
+                        lhs: LValueF::Id(num.clone()),
+                        rhs: LValueF::Id(approx.clone()),
+                        temp_result: t8,
+                    },
+                    // ADDF approx $T8 $T9
+                    AddF {
+                        lhs: LValueF::Id(approx.clone()),
+                        rhs: LValueF::Temp(t8),
+                        temp_result: t9,
+                    },
+                    // MULTF $T7 $T9 $T10
+                    MulF {
+                        lhs: LValueF::Temp(t7),
+                        rhs: LValueF::Temp(t9),
+                        temp_result: t10,
+                    },
+                    // STOREF $T10 newapprox
+                    StoreF {
+                        lhs: LValueF::Id(newapprox.clone()),
+                        rhs: RValueF::LValue(LValueF::Temp(t10)),
+                    },
+                    // STOREF newapprox approx
+                    StoreF {
+                        lhs: LValueF::Id(approx.clone()),
+                        rhs: RValueF::LValue(LValueF::Id(newapprox.clone())),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label3,
+            (
+                bb_label3,
+                vec![
+                    // LABEL label3
+                    Label(tac_label3),
+                    // STOREI 1 $T5
+                    StoreI {
+                        lhs: LValueI::Temp(t5),
+                        rhs: RValueI::RValue(1),
+                    },
+                    // SUBI i $T5 $T6
+                    SubI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: LValueI::Temp(t5),
+                        temp_result: t6,
+                    },
+                    // STOREI $T6 i
+                    StoreI {
+                        lhs: LValueI::Id(i.clone()),
+                        rhs: RValueI::LValue(LValueI::Temp(t6)),
+                    },
+                    // JUMP label1
+                    Jump(tac_label1),
+                ],
+            )
+                .into(),
+        );
+
+        bbs.insert(
+            bb_label4,
+            (
+                bb_label4,
+                vec![
+                    // LABEL label2
+                    Label(tac_label2),
+                    // WRITEF approx
+                    WriteF {
+                        identifier: approx.clone(),
+                    },
+                ],
+            )
+                .into(),
+        );
+
+        let mut bb_map = LinkedHashMap::new();
+        bb_map.insert(bb_label0, vec![bb_label1]);
+        bb_map.insert(bb_label1, vec![bb_label4, bb_label2]);
+        bb_map.insert(bb_label2, vec![bb_label3]);
+        bb_map.insert(bb_label3, vec![bb_label1]);
+
+        let expected_cfg = ControlFlowGraph::new(bb_map, bbs);
+
+        // Parse program, generate 3AC, convert it into a `BBFunction` and convert `BBFunction` to a `ControlFlowGraph`
+        let program = microc::ProgramParser::new().parse(&program);
+        let mut result = program.unwrap();
+        let mut visitor = ThreeAddressCodeVisitor;
+        result.reverse();
+        let cfg = result
+            .into_iter()
+            .map(|ast_node| visitor.walk_ast(ast_node))
+            .map(|code_object| Into::<BBFunction>::into(code_object))
+            .map(|bb_func| Into::<ControlFlowGraph>::into(bb_func))
+            .last()
+            .unwrap();
+        /*
+            Expected basic blocks -
+            ```
+            ==== Basic Blocks ===
+            BB0:
+            LABEL main
+            LINK
+            READF num
+            STOREI 1 $T1
+            STOREI $T1 j
+            STOREF num approx
+            STOREI 100 $T2
+            STOREI $T2 i
+
+            BB1:
+            LABEL label1
+            STOREI 0 $T3
+            EQ i $T3 label2
+
+            BB2:
+            STOREF 0.5 $T6
+            DIVF num approx $T7
+            ADDF approx $T7 $T8
+            MULTF $T6 $T8 $T9
+            STOREF $T9 newapprox
+            STOREF newapprox approx
+
+            BB3:
+            LABEL label3
+            STOREI 1 $T4
+            SUBI i $T4 $T5
+            STOREI $T5 i
+            JUMP label1
+
+            BB4:
+            LABEL label2
+            WRITEF approx
+
+
+            ==== CFG ===
+            BB0: [BBLabel(1)]
+            BB1: [BBLabel(2), BBLabel(4)]
+            BB2: [BBLabel(3)]
+            BB3: [BBLabel(1), BBLabel(4)]
             ```
         */
         // println!("{expected_cfg}");

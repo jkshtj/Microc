@@ -36,7 +36,7 @@ impl LivenessMetadata {
             gen_set: Rc::new(RefCell::new(gen_set)),
             kill_set: Rc::new(RefCell::new(kill_set)),
             in_set: Rc::new(RefCell::new(in_set)),
-            out_set: Rc::new(RefCell::new(out_set))
+            out_set: Rc::new(RefCell::new(out_set)),
         }
     }
 
@@ -288,6 +288,24 @@ impl Display for LivenessDecoratedThreeAddressCode {
         write!(f, "{}", self.tac())?;
         write!(f, "{:>space$}", "| LIVE: ")?;
         self.out_set()
+            .borrow()
+            .iter()
+            .try_for_each(|x| write!(f, "{x}, "))?;
+
+        write!(f, "| IN: ")?;
+        self.in_set()
+            .borrow()
+            .iter()
+            .try_for_each(|x| write!(f, "{x}, "))?;
+
+        write!(f, "| GEN: ")?;
+        self.gen_set()
+            .borrow()
+            .iter()
+            .try_for_each(|x| write!(f, "{x}, "))?;
+
+        write!(f, "| KILL: ")?;
+        self.kill_set()
             .borrow()
             .iter()
             .try_for_each(|x| write!(f, "{x}, "))
@@ -1451,4 +1469,6 @@ mod test {
 
         assert_eq!(expected_cfg, cfg);
     }
+
+    // TODO: Add unit test for a program with a loop
 }
