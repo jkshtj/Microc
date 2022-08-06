@@ -1,8 +1,5 @@
 use crate::register_alloc::types::RegisterId;
-use crate::three_addr_code_ir::{
-    FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, RValueF, RValueI, ResultType,
-    TempF, TempI,
-};
+use crate::three_addr_code_ir::{FunctionIdent, IdentF, IdentI, IdentS, LValueF, LValueI, Label, RValueF, RValueI, ResultType, TempF, TempI, LValue};
 
 #[derive(Debug, Clone, derive_more::Display, PartialEq)]
 pub enum ThreeAddressCode {
@@ -151,7 +148,9 @@ pub enum ThreeAddressCode {
     #[display(fmt = "LINK")]
     Link(FunctionIdent),
     #[display(fmt = "RET")]
-    Ret,
+    RetI(IdentI),
+    #[display(fmt = "RET")]
+    RetF(IdentF),
     #[display(fmt = "PUSH")]
     PushEmpty,
     #[display(fmt = "PUSH {}", _0)]
@@ -206,7 +205,7 @@ impl ThreeAddressCode {
     }
 
     pub fn is_return(&self) -> bool {
-        matches!(self, ThreeAddressCode::Ret)
+        matches!(self, ThreeAddressCode::RetI(_) | ThreeAddressCode::RetF(_))
     }
 
     pub fn is_unconditional_branch(&self) -> bool {
@@ -431,8 +430,16 @@ pub mod visit {
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::Return(assignment) => {
+                    let lhs = assignment.lhs().clone().symbol;
+
                     let mut code_sequence = self.visit_assignment(assignment).code_sequence;
-                    code_sequence.push(ThreeAddressCode::Ret);
+                    match lhs.symbol_type() {
+                        DataType::String => unreachable!("String symbols cannot be returned from functions!"),
+                        DataType::Num(num_type) => match num_type {
+                            NumType::Int => code_sequence.push(ThreeAddressCode::RetI(IdentI(lhs))),
+                            NumType::Float => code_sequence.push(ThreeAddressCode::RetF(IdentF(lhs))),
+                        }
+                    }
                     CodeObject::builder().code_sequence(code_sequence).build()
                 }
                 Stmt::None => {

@@ -24,6 +24,26 @@ pub mod data {
         FunctionScopedSymbol(Rc<FunctionScopedSymbol>),
     }
 
+    impl Symbol {
+        pub fn symbol_type(&self) -> DataType {
+            match self {
+                Symbol::NonFunctionScopedSymbol(symbol) => {
+                    match &**symbol {
+                        NonFunctionScopedSymbol::String {..} => DataType::String,
+                        NonFunctionScopedSymbol::Int {..} => DataType::Num(NumType::Int),
+                        NonFunctionScopedSymbol::Float {..} => DataType::Num(NumType::Float),
+                    }
+                }
+                Symbol::FunctionScopedSymbol(symbol) => {
+                    match &**symbol {
+                        FunctionScopedSymbol::Int {..} => DataType::Num(NumType::Int),
+                        FunctionScopedSymbol::Float {..} => DataType::Num(NumType::Float),
+                    }
+                }
+            }
+        }
+    }
+
     impl From<Rc<NonFunctionScopedSymbol>> for Symbol {
         fn from(symbol: Rc<NonFunctionScopedSymbol>) -> Self {
             Symbol::NonFunctionScopedSymbol(symbol)

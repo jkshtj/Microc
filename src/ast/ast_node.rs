@@ -97,6 +97,12 @@ pub struct Assignment {
     pub rhs: Expr,
 }
 
+impl Assignment {
+    pub fn lhs(&self)-> &Identifier {
+        &self.lhs
+    }
+}
+
 /// A boolean expression that evaluates
 /// to either true or false.
 #[derive(Debug, Clone)]

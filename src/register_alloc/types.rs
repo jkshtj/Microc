@@ -110,7 +110,6 @@ pub struct Spill {
 }
 
 impl Spill {
-    #[cfg(test)]
     pub fn new(
         spill_type: SpillType,
         register_id: RegisterId,
@@ -294,6 +293,21 @@ impl RegisterFile {
         });
 
         result
+    }
+
+    pub fn get_register_id_for_value(&self, operand: &LValue) -> Option<RegisterId> {
+        self
+            .registers()
+            .iter()
+            .filter(|&register| {
+                if let Some(value) = register.value() {
+                    value == operand
+                } else {
+                    false
+                }
+            })
+            .map(|register| register.id())
+            .nth(0)
     }
 
     pub fn ensure_register(

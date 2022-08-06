@@ -244,7 +244,7 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
             // any gen and use sets, but add the out set, which is always all
             // the globals present in the program because global variables may
             // be used after the function returns.
-            ThreeAddressCode::Ret => {
+            ThreeAddressCode::RetI(ident) => {
                 SymbolTable::global_symbols()
                     .into_iter()
                     .filter_map(|symbol| match symbol.data_type() {
@@ -259,6 +259,26 @@ impl From<ThreeAddressCode> for LivenessDecoratedThreeAddressCode {
                     .for_each(|symbol| {
                         out_set.insert(symbol);
                     });
+
+                out_set.insert(LValue::LValueI(LValueI::Id(ident.clone())));
+            }
+            ThreeAddressCode::RetF(ident) => {
+                SymbolTable::global_symbols()
+                    .into_iter()
+                    .filter_map(|symbol| match symbol.data_type() {
+                        DataType::Num(NumType::Int) => {
+                            Some(LValue::LValueI(LValueI::Id(IdentI(symbol.into()))))
+                        }
+                        DataType::Num(NumType::Float) => {
+                            Some(LValue::LValueF(LValueF::Id(IdentF(symbol.into()))))
+                        }
+                        _ => None,
+                    })
+                    .for_each(|symbol| {
+                        out_set.insert(symbol);
+                    });
+
+                out_set.insert(LValue::LValueF(LValueF::Id(ident.clone())));
             }
             _ => (),
         }
@@ -466,7 +486,7 @@ impl LivenessDecoratedControlFlowGraph {
                 //
                 // 2. If this is a bb terminator then the current 3AC node may
                 // have multiple successors.
-                let mut out_set = HashSet::new();
+                let mut out_set = tac.out_set().borrow().clone();
 
                 // If the current 3AC is not an unconditional jump then the
                 // successor 3AC node's (which we actually visited in the previous

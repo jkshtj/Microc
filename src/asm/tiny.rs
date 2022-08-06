@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::register_alloc::types::{RegisterAllocatedThreeAddressCode, RegisterId, SpillType};
+use crate::register_alloc::types::{RegisterAllocatedThreeAddressCode, RegisterId, SpillType, Spill};
 use crate::symbol_table::symbol::data::{FunctionScopedSymbol, NonFunctionScopedSymbol, Symbol};
 use crate::symbol_table::symbol::{data, function};
 use crate::symbol_table::SymbolTable;
@@ -243,7 +243,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
             }
         });
 
-        let is_branch_or_ret_instr = tac.is_branch() || tac.is_return();
+        let mut jump_or_ret_instrs = vec![];
 
         // Generate tiny code for this 3AC
         match tac {
@@ -487,9 +487,6 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
             ThreeAddressCode::Label(label) => {
                 code_sequence.push(TinyCode::Label(label.into()));
             }
-            ThreeAddressCode::Jump(label) => {
-                code_sequence.push(TinyCode::Jmp(label.into()));
-            }
             ThreeAddressCode::GtI { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
                 let rhs_reg = register_allocations[&rhs.into()].into();
@@ -500,7 +497,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jgt(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jgt(label.into()));
             }
             ThreeAddressCode::LtI { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -512,7 +509,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jlt(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jlt(label.into()));
             }
             ThreeAddressCode::GteI { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -536,7 +533,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jle(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jle(label.into()));
             }
             ThreeAddressCode::NeI { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -548,7 +545,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jne(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jne(label.into()));
             }
             ThreeAddressCode::EqI { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -560,7 +557,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jeq(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jeq(label.into()));
             }
             ThreeAddressCode::GtF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -572,7 +569,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jgt(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jgt(label.into()));
             }
             ThreeAddressCode::LtF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -584,7 +581,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jlt(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jlt(label.into()));
             }
             ThreeAddressCode::GteF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -596,7 +593,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jge(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jge(label.into()));
             }
             ThreeAddressCode::LteF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -608,7 +605,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jle(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jle(label.into()));
             }
             ThreeAddressCode::NeF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -620,7 +617,7 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jne(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jne(label.into()));
             }
             ThreeAddressCode::EqF { lhs, rhs, label } => {
                 let lhs_reg = register_allocations[&lhs.into()].into();
@@ -632,14 +629,17 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     rhs_reg,
                 ));
 
-                code_sequence.push(TinyCode::Jeq(label.into()));
+                jump_or_ret_instrs.push(TinyCode::Jeq(label.into()));
+            }
+            ThreeAddressCode::Jump(label) => {
+                jump_or_ret_instrs.push(TinyCode::Jmp(label.into()));
+            }
+            ThreeAddressCode::RetI(_) | ThreeAddressCode::RetF(_) => {
+                jump_or_ret_instrs.push(TinyCode::Unlink);
+                jump_or_ret_instrs.push(TinyCode::Ret);
             }
             ThreeAddressCode::FunctionLabel(func) => {
                 code_sequence.push(TinyCode::FunctionLabel(func.0))
-            }
-            ThreeAddressCode::Ret => {
-                code_sequence.push(TinyCode::Unlink);
-                code_sequence.push(TinyCode::Ret);
             }
             ThreeAddressCode::PushEmpty => {
                 code_sequence.push(TinyCode::PushEmpty);
@@ -685,18 +685,9 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
             ),
         }
 
-        // If this tac had the end_of_bb_spills and tac is not a branch
-        // then simply add the end_of_bb_spills to the generated 3AC code
-        // sequence. Otherwise pop the last tiny instruction (which) is
-        // going to be a branch, add the end_of_bb spills and add back the
-        // previously popped tiny branch instruction.
+        // If this tac had the end_of_bb_spills, add the end_of_bb_spills
+        // to the generated 3AC code sequence.
         if let Some(end_of_bb_spills) = end_of_bb_spills {
-            let instr = if is_branch_or_ret_instr {
-                code_sequence.pop()
-            } else {
-                None
-            };
-
             // Generate end of bb spills
             end_of_bb_spills.into_iter().for_each(|spill| {
                 let (spill_type, register_id, memory_location) = spill.into_parts();
@@ -717,11 +708,9 @@ impl From<RegisterAllocatedThreeAddressCode> for TinyCodeSequence {
                     }
                 }
             });
-
-            if let Some(instr) = instr {
-                code_sequence.push(instr);
-            }
         }
+
+        code_sequence.extend(jump_or_ret_instrs);
 
         TinyCodeSequence {
             sequence: code_sequence,

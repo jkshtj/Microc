@@ -2,9 +2,7 @@ use crate::cfg::basic_block::BBLabel;
 use crate::cfg::liveness::{
     LivenessDecoratedControlFlowGraph, LivenessDecoratedThreeAddressCode, LivenessMetadata,
 };
-use crate::register_alloc::types::{
-    RegisterAllocatedThreeAddressCode, RegisterFile, RegisterId, Spill,
-};
+use crate::register_alloc::types::{RegisterAllocatedThreeAddressCode, RegisterFile, RegisterId, Spill, SpillType};
 use crate::three_addr_code_ir::three_address_code::ThreeAddressCode;
 use crate::three_addr_code_ir::{RValueF, RValueI};
 use std::collections::HashSet;
@@ -501,7 +499,50 @@ pub fn perform_register_allocation(
                         reg_alloc_tac.add_spills(spills);
                         reg_alloc_tac
                     }
-                    // ThreeAddressCode::Ret => {}
+                    ThreeAddressCode::RetI(ident) => {
+                        // It is safe to unwrap here as the `lvalue` in the
+                        // return statement must already have a register. This is
+                        // guaranteed by the fact that all `return` statements are
+                        // preceded by assignment statements that assign the expression
+                        // to be returned to the very first parameter passed to the function.
+                        let lvalue = ident.to_lvalue();
+                        let ident_clone = ident.0.clone();
+                        let register_id = register_file.get_register_id_for_value(&lvalue).unwrap();
+
+                        // TODO: This is leading to double `move` instructions
+                        // as we are also spilling all live vars at the end of the bb.
+                        // But things work right now, so it's ok.
+                        let mut reg_alloc_tac = RegisterAllocatedThreeAddressCode::new(tac);
+                        reg_alloc_tac.add_spills(vec![Spill::new(
+                            SpillType::Store,
+                            register_id,
+                            ident_clone
+                        )]);
+
+                        reg_alloc_tac
+                    }
+                    ThreeAddressCode::RetF(ident) => {
+                        // It is safe to unwrap here as the `lvalue` in the
+                        // return statement must already have a register. This is
+                        // guaranteed by the fact that all `return` statements are
+                        // preceded by assignment statements that assign the expression
+                        // to be returned to the very first parameter passed to the function.
+                        let lvalue = ident.to_lvalue();
+                        let ident_clone = ident.0.clone();
+                        let register_id = register_file.get_register_id_for_value(&lvalue).unwrap();
+
+                        // TODO: This is leading to double `move` instructions
+                        // as we are also spilling all live vars at the end of the bb.
+                        // But things work right now, so it's ok.
+                        let mut reg_alloc_tac = RegisterAllocatedThreeAddressCode::new(tac);
+                        reg_alloc_tac.add_spills(vec![Spill::new(
+                            SpillType::Store,
+                            register_id,
+                            ident_clone
+                        )]);
+
+                        reg_alloc_tac
+                    }
                     _ => RegisterAllocatedThreeAddressCode::new(tac),
                 };
 
